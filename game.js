@@ -1,0 +1,1934 @@
+// ============================================
+// POPPIES - Piraten Platformer
+// ============================================
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreDisplay = document.getElementById('scoreDisplay');
+const levelDisplay = document.getElementById('levelDisplay');
+const restartBtn = document.getElementById('restartBtn');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+const gameContainer = document.getElementById('gameContainer');
+
+// Game afmetingen
+const BASE_WIDTH = 1200;
+const BASE_HEIGHT = 700;
+
+// Camera
+let cameraX = 0;
+
+// Canvas grootte
+function resizeCanvas() {
+    const isFullscreen = document.fullscreenElement === gameContainer;
+    if (isFullscreen) {
+        const maxWidth = window.innerWidth * 0.95;
+        const maxHeight = window.innerHeight * 0.85;
+        const ratio = Math.min(maxWidth / BASE_WIDTH, maxHeight / BASE_HEIGHT);
+        canvas.width = BASE_WIDTH * ratio;
+        canvas.height = BASE_HEIGHT * ratio;
+    } else {
+        canvas.width = Math.min(BASE_WIDTH, window.innerWidth - 40);
+        canvas.height = (canvas.width / BASE_WIDTH) * BASE_HEIGHT;
+    }
+}
+
+// ============================================
+// AFBEELDINGEN
+// ============================================
+// Standaard/idle afbeelding
+const playerImage = new Image();
+let playerImageLoaded = false;
+playerImage.src = 'assets/poppy1.png';
+playerImage.onload = () => { playerImageLoaded = true; };
+
+// Walk animatie frames
+const walkFrames = [];
+const walkFrameCount = 4;
+let walkFramesLoaded = 0;
+
+for (let i = 1; i <= walkFrameCount; i++) {
+    const img = new Image();
+    img.src = `assets/poppy${i}.png`;
+    img.onload = () => {
+        img.loaded = true;
+        walkFramesLoaded++;
+    };
+    img.onerror = () => { img.loaded = false; };
+    walkFrames.push(img);
+}
+
+// Jump frame (optioneel)
+const jumpImage = new Image();
+let jumpImageLoaded = false;
+jumpImage.src = 'assets/poppy_jump.png';
+jumpImage.onload = () => { jumpImageLoaded = true; };
+jumpImage.onerror = () => { jumpImageLoaded = false; };
+
+// Vijand walk animatie frames
+const enemyWalkFrames = [];
+const enemyWalkFrameCount = 4;
+let enemyWalkFramesLoaded = 0;
+
+for (let i = 1; i <= enemyWalkFrameCount; i++) {
+    const img = new Image();
+    img.src = `assets/enemy${i}.png`;
+    img.onload = () => {
+        img.loaded = true;
+        enemyWalkFramesLoaded++;
+    };
+    img.onerror = () => { img.loaded = false; };
+    enemyWalkFrames.push(img);
+}
+
+// ============================================
+// AUDIO SYSTEEM
+// ============================================
+let audioContext = null;
+
+function initAudio() {
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioContext.state === 'suspended') {
+        audioContext.resume();
+    }
+}
+
+// Poing geluid bij springen
+function playJumpSound() {
+    if (!audioContext) return;
+
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(600, audioContext.currentTime + 0.1);
+    oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.2);
+
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+}
+
+// Munt verzamel geluid
+function playCoinSound() {
+    if (!audioContext) return;
+
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+    oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1);
+
+    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.2);
+}
+
+// Vijand verslagen geluid
+function playEnemyDefeatSound() {
+    if (!audioContext) return;
+
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.type = 'sawtooth';
+    oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.3);
+
+    gainNode.gain.setValueAtTime(0.25, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+}
+
+// Game over geluid
+function playGameOverSound() {
+    if (!audioContext) return;
+
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.5);
+
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.5);
+}
+
+// Platform breek geluid
+function playBreakSound() {
+    if (!audioContext) return;
+
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.type = 'triangle';
+    oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.2);
+
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.2);
+}
+
+// Level voltooid geluid - vrolijk oplopend melodietje
+function playLevelCompleteSound() {
+    if (!audioContext) return;
+
+    const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
+    notes.forEach((freq, i) => {
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, audioContext.currentTime + i * 0.15);
+        gain.gain.setValueAtTime(0.2, audioContext.currentTime + i * 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + i * 0.15 + 0.3);
+        osc.start(audioContext.currentTime + i * 0.15);
+        osc.stop(audioContext.currentTime + i * 0.15 + 0.3);
+    });
+}
+
+// ============================================
+// GAME STATE
+// ============================================
+let gameRunning = false;
+let gameStarted = false;
+let score = 0;
+let highScore = localStorage.getItem('poppiesHighScore') || 0;
+let currentLevel = 1;
+let levelComplete = false;
+let gameWon = false;
+let flag = null;
+
+// Level configuratie - moeilijkheid neemt toe per level
+const levelConfig = {
+    1: { worldWidth: 5000, gapChance: 0.20, breakableChance: 0.25, enemySpacing: 500, enemySpeed: 1.5, cannonCount: 0, cannonFireRate: 0 },
+    2: { worldWidth: 6500, gapChance: 0.30, breakableChance: 0.35, enemySpacing: 400, enemySpeed: 2.5, cannonCount: 3, cannonFireRate: 180 },
+    3: { worldWidth: 8000, gapChance: 0.40, breakableChance: 0.45, enemySpacing: 300, enemySpeed: 3.5, cannonCount: 5, cannonFireRate: 140 }
+};
+
+// ============================================
+// SPELER
+// ============================================
+const player = {
+    x: 100,
+    y: 400,
+    width: 60,        // Collision box
+    height: 100,      // Collision box
+    drawWidth: 120,   // Grotere tekening
+    drawHeight: 170,
+    velocityX: 0,
+    velocityY: 0,
+    speed: 6,
+    jumpForce: -24,
+    gravity: 0.9,
+    grounded: false,
+    jumpHeld: false,
+    jumpCut: false,
+    facingRight: true,
+    // Salto
+    rotation: 0,
+    doingSalto: false,
+    // Walk animatie
+    walkFrame: 0,
+    walkTimer: 0,
+    walkFrameSpeed: 8 // Hoe hoger, hoe langzamer de animatie
+};
+
+const SCREEN_CENTER = BASE_WIDTH / 2 - player.width / 2;
+
+// ============================================
+// WERELD ELEMENTEN
+// ============================================
+let platforms = [];
+let enemies = [];
+let coins = [];
+let debris = []; // Brokstukken van gebroken platforms
+let cannons = [];
+let cannonballs = [];
+let worldWidth = 5000; // Totale wereld breedte
+
+function generateWorld() {
+    platforms = [];
+    enemies = [];
+    coins = [];
+    cannons = [];
+    cannonballs = [];
+
+    const config = levelConfig[currentLevel];
+    worldWidth = config.worldWidth;
+
+    // Vlag positie
+    const flagX = worldWidth - 300;
+
+    // Vloer segmenten (met gaten)
+    let floorX = 0;
+    while (floorX < worldWidth) {
+        const segmentWidth = 400 + Math.random() * 600;
+
+        // Garandeer dat er vloer is onder de vlag
+        const segmentEnd = floorX + segmentWidth;
+        const coversFlag = floorX <= flagX && segmentEnd >= flagX + 80;
+        const nearFlag = flagX - floorX < 600 && flagX > floorX;
+
+        platforms.push({
+            x: floorX,
+            y: 600,
+            width: nearFlag && !coversFlag ? Math.max(segmentWidth, flagX - floorX + 200) : segmentWidth,
+            height: 100,
+            type: 'floor'
+        });
+
+        const actualWidth = nearFlag && !coversFlag ? Math.max(segmentWidth, flagX - floorX + 200) : segmentWidth;
+
+        // Soms een gat in de vloer (niet bij de vlag)
+        const gapAllowed = floorX > 800 && (floorX + actualWidth + 200) < flagX - 100;
+        const gapChance = gapAllowed ? config.gapChance : 0;
+        if (Math.random() < gapChance) {
+            floorX += actualWidth + 120 + Math.random() * 80;
+        } else {
+            floorX += actualWidth;
+        }
+    }
+
+    // Vlag object aanmaken
+    flag = {
+        x: flagX,
+        y: 600, // Bovenkant van de vloer
+        width: 60,
+        height: 120, // Paal hoogte
+        reached: false
+    };
+
+    // Zwevende platforms - hoger en meer verspreid
+    let platformX = 400;
+    let lastPlatformY = 400;
+
+    while (platformX < worldWidth - 500) {
+        const gap = 220 + Math.random() * 280;
+        platformX += gap;
+
+        const heightChange = (Math.random() - 0.5) * 180;
+        let py = lastPlatformY + heightChange;
+        py = Math.max(200, Math.min(450, py));
+        lastPlatformY = py;
+
+        const pw = 120 + Math.random() * 100;
+        const breakable = Math.random() < config.breakableChance;
+
+        platforms.push({
+            x: platformX,
+            y: py,
+            width: pw,
+            height: 25,
+            type: 'platform',
+            breakable: breakable,
+            broken: false
+        });
+
+        if (Math.random() < 0.5) {
+            coins.push({
+                x: platformX + pw / 2 - 15,
+                y: py - 60,
+                collected: false
+            });
+        }
+
+        if (Math.random() < 0.3) {
+            const extraX = platformX + 100 + Math.random() * 150;
+            const extraY = py > 350 ? py - 100 - Math.random() * 80 : py + 100 + Math.random() * 80;
+            if (extraY > 180 && extraY < 480) {
+                platforms.push({
+                    x: extraX,
+                    y: extraY,
+                    width: 100 + Math.random() * 80,
+                    height: 25,
+                    type: 'platform',
+                    breakable: Math.random() < 0.4,
+                    broken: false
+                });
+            }
+        }
+    }
+
+    // Vijanden - afstand en snelheid op basis van level
+    let enemyX = 800;
+    while (enemyX < worldWidth - 400) {
+        enemyX += config.enemySpacing + Math.random() * config.enemySpacing;
+
+        const platform = platforms.find(p =>
+            !p.breakable && enemyX >= p.x + 30 && enemyX <= p.x + p.width - 80
+        );
+
+        if (platform) {
+            enemies.push({
+                x: enemyX,
+                y: platform.y - player.height,
+                width: player.width,
+                height: player.height,
+                drawWidth: player.drawWidth,
+                drawHeight: player.drawHeight,
+                baseX: enemyX,
+                moveRange: 60 + Math.random() * 80,
+                speed: 1 + Math.random() * (config.enemySpeed - 1),
+                direction: 1,
+                platformY: platform.y,
+                walkFrame: 0,
+                walkTimer: 0
+            });
+        }
+    }
+
+    // Munten in de lucht - leuke patronen
+    let coinX = 250;
+    while (coinX < worldWidth - 200) {
+        coinX += 200 + Math.random() * 300;
+
+        if (Math.random() < 0.3) {
+            const baseY = 300 + Math.random() * 150;
+            for (let i = 0; i < 5; i++) {
+                const arcY = baseY - Math.sin(i / 4 * Math.PI) * 80;
+                coins.push({
+                    x: coinX + i * 40,
+                    y: arcY,
+                    collected: false
+                });
+            }
+            coinX += 200;
+        }
+        else if (Math.random() < 0.4) {
+            const baseY = 250 + Math.random() * 100;
+            for (let i = 0; i < 3; i++) {
+                coins.push({
+                    x: coinX,
+                    y: baseY + i * 50,
+                    collected: false
+                });
+            }
+        }
+        else {
+            coins.push({
+                x: coinX,
+                y: 220 + Math.random() * 280,
+                collected: false
+            });
+        }
+    }
+
+    // Kanonnen plaatsen op vloersegmenten (alleen level 2+)
+    if (config.cannonCount > 0) {
+        const floorPlatforms = platforms.filter(p => p.type === 'floor');
+        const spacing = worldWidth / (config.cannonCount + 1);
+
+        for (let i = 0; i < config.cannonCount; i++) {
+            const targetX = spacing * (i + 1);
+
+            // Zoek het dichtstbijzijnde vloersegment
+            const floor = floorPlatforms.find(p => targetX >= p.x && targetX <= p.x + p.width - 60);
+            if (floor) {
+                const cannonWidth = 60;
+                const cannonHeight = 40;
+                cannons.push({
+                    x: targetX,
+                    y: floor.y - cannonHeight,
+                    width: cannonWidth,
+                    height: cannonHeight,
+                    direction: Math.random() < 0.5 ? -1 : 1,
+                    fireTimer: Math.floor(Math.random() * config.cannonFireRate),
+                    fireRate: config.cannonFireRate
+                });
+            }
+        }
+    }
+}
+
+// ============================================
+// BESTURING
+// ============================================
+const keys = { left: false, right: false, jump: false };
+
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+        e.preventDefault();
+        keys.jump = true;
+        if (!gameStarted) startGame();
+        else if (levelComplete && !gameWon) nextLevel();
+        else if (gameWon) restartGame();
+        else if (!gameRunning) restartGame();
+    }
+});
+
+document.addEventListener('keyup', (e) => {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') keys.jump = false;
+});
+
+// Touch support
+let touchLeft = false, touchRight = false;
+canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (!gameStarted) { startGame(); return; }
+    if (levelComplete && !gameWon) { nextLevel(); return; }
+    if (gameWon) { restartGame(); return; }
+    if (!gameRunning) { restartGame(); return; }
+
+    for (let touch of e.touches) {
+        const rect = canvas.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+
+        if (x < rect.width / 3) {
+            touchLeft = true;
+        } else if (x > rect.width * 2 / 3) {
+            touchRight = true;
+        } else {
+            if (player.grounded) {
+                player.velocityY = player.jumpForce;
+                player.grounded = false;
+                playJumpSound();
+            }
+        }
+    }
+});
+
+canvas.addEventListener('touchend', (e) => {
+    if (e.touches.length === 0) {
+        touchLeft = false;
+        touchRight = false;
+    }
+});
+
+// ============================================
+// FULLSCREEN
+// ============================================
+fullscreenBtn.addEventListener('click', () => {
+    if (gameContainer.requestFullscreen) {
+        gameContainer.requestFullscreen();
+    } else if (gameContainer.webkitRequestFullscreen) {
+        gameContainer.webkitRequestFullscreen();
+    }
+});
+
+document.addEventListener('fullscreenchange', () => {
+    resizeCanvas();
+    canvas.focus();
+});
+
+window.addEventListener('resize', resizeCanvas);
+
+// ============================================
+// GAME FUNCTIES
+// ============================================
+
+function startGame() {
+    initAudio();
+    gameStarted = true;
+    gameRunning = true;
+    score = 0;
+    currentLevel = 1;
+    levelComplete = false;
+    gameWon = false;
+    cameraX = 0;
+
+    player.x = 100;
+    player.y = 400;
+    player.velocityX = 0;
+    player.velocityY = 0;
+    player.grounded = false;
+    player.facingRight = true;
+
+    debris = [];
+    cannons = [];
+    cannonballs = [];
+    generateWorld();
+    restartBtn.style.display = 'none';
+    scoreDisplay.textContent = 'Score: 0';
+    levelDisplay.textContent = `Level: ${currentLevel}`;
+}
+
+function restartGame() {
+    startGame();
+}
+
+function nextLevel() {
+    currentLevel++;
+    levelComplete = false;
+    gameRunning = true;
+    cameraX = 0;
+
+    player.x = 100;
+    player.y = 400;
+    player.velocityX = 0;
+    player.velocityY = 0;
+    player.grounded = false;
+    player.facingRight = true;
+    player.rotation = 0;
+    player.doingSalto = false;
+
+    debris = [];
+    cannons = [];
+    cannonballs = [];
+    generateWorld();
+    restartBtn.style.display = 'none';
+    levelDisplay.textContent = `Level: ${currentLevel}`;
+}
+
+function gameOver() {
+    gameRunning = false;
+    playGameOverSound();
+    if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('poppiesHighScore', highScore);
+    }
+    restartBtn.style.display = 'inline-block';
+}
+
+function getScale() {
+    return canvas.width / BASE_WIDTH;
+}
+
+// ============================================
+// UPDATE
+// ============================================
+
+function update() {
+    if (!gameRunning) return;
+
+    // Horizontale beweging
+    const moveLeft = keys.left || touchLeft;
+    const moveRight = keys.right || touchRight;
+
+    if (moveLeft) {
+        player.velocityX = -player.speed;
+        player.facingRight = false;
+    } else if (moveRight) {
+        player.velocityX = player.speed;
+        player.facingRight = true;
+    } else {
+        player.velocityX *= 0.8;
+    }
+
+    // Springen
+    if (keys.jump && player.grounded) {
+        player.velocityY = player.jumpForce;
+        player.grounded = false;
+        player.jumpHeld = true;
+        player.jumpCut = false;
+        playJumpSound();
+
+        // 25% kans op salto!
+        if (Math.random() < 0.25) {
+            player.doingSalto = true;
+            player.rotation = 0;
+        }
+    }
+
+    // Variabele spronghoogte - laat los voor lagere sprong
+    if (!keys.jump && player.jumpHeld && !player.jumpCut && player.velocityY < 0) {
+        player.velocityY *= 0.4; // Verminder opwaartse snelheid flink bij loslaten
+        player.jumpCut = true;
+    }
+    if (player.grounded) {
+        player.jumpHeld = false;
+        player.jumpCut = false;
+    }
+
+    // Update salto rotatie
+    if (player.doingSalto && !player.grounded) {
+        player.rotation += 0.15; // Draai snelheid
+        if (player.rotation >= Math.PI * 2) {
+            player.rotation = 0;
+            player.doingSalto = false;
+        }
+    }
+
+    // Reset rotatie bij landen
+    if (player.grounded) {
+        player.rotation = 0;
+        player.doingSalto = false;
+    }
+
+    // Walk animatie update
+    if (Math.abs(player.velocityX) > 0.5 && player.grounded) {
+        player.walkTimer++;
+        if (player.walkTimer >= player.walkFrameSpeed) {
+            player.walkTimer = 0;
+            player.walkFrame = (player.walkFrame + 1) % walkFrameCount;
+        }
+    } else {
+        player.walkFrame = 0;
+        player.walkTimer = 0;
+    }
+
+    // Zwaartekracht
+    player.velocityY += player.gravity;
+
+    // Horizontale beweging
+    player.x += player.velocityX;
+
+    // Horizontale collision met platforms
+    platforms.forEach(platform => {
+        if (checkCollision(player, platform)) {
+            // Van links botsen
+            if (player.velocityX > 0 && player.x + player.width - player.velocityX <= platform.x) {
+                player.x = platform.x - player.width;
+                player.velocityX = 0;
+            }
+            // Van rechts botsen
+            else if (player.velocityX < 0 && player.x - player.velocityX >= platform.x + platform.width) {
+                player.x = platform.x + platform.width;
+                player.velocityX = 0;
+            }
+        }
+    });
+
+    // Verticale beweging
+    player.y += player.velocityY;
+
+    // Verticale collision met platforms
+    player.grounded = false;
+    platforms.forEach(platform => {
+        if (platform.broken) return; // Skip gebroken platforms
+
+        if (checkCollision(player, platform)) {
+            // Van boven landen
+            if (player.velocityY > 0 && player.y + player.height - player.velocityY <= platform.y + 10) {
+                player.y = platform.y - player.height;
+                player.velocityY = 0;
+                player.grounded = true;
+            }
+            // Van onder botsen
+            else if (player.velocityY < 0 && player.y - player.velocityY >= platform.y + platform.height - 10) {
+                // Check of platform breekbaar is
+                if (platform.breakable && platform.type === 'platform') {
+                    // Breek het platform!
+                    platform.broken = true;
+                    score += 25;
+                    scoreDisplay.textContent = `Score: ${score}`;
+                    playBreakSound();
+
+                    // Maak brokstukken
+                    for (let i = 0; i < 6; i++) {
+                        debris.push({
+                            x: platform.x + Math.random() * platform.width,
+                            y: platform.y + Math.random() * platform.height,
+                            vx: (Math.random() - 0.5) * 8,
+                            vy: -Math.random() * 8 - 2,
+                            size: 8 + Math.random() * 12,
+                            rotation: Math.random() * Math.PI * 2,
+                            rotationSpeed: (Math.random() - 0.5) * 0.3,
+                            life: 60
+                        });
+                    }
+
+                    // Kleine bounce voor de speler
+                    player.velocityY = 2;
+                } else {
+                    // Normaal platform - gewoon stoppen
+                    player.y = platform.y + platform.height;
+                    player.velocityY = 0;
+                }
+            }
+        }
+    });
+
+    // Update debris
+    debris = debris.filter(d => {
+        d.x += d.vx;
+        d.y += d.vy;
+        d.vy += 0.4; // Zwaartekracht
+        d.rotation += d.rotationSpeed;
+        d.life--;
+        return d.life > 0;
+    });
+
+    // Verwijder gebroken platforms
+    platforms = platforms.filter(p => !p.broken);
+
+    // Wereld grenzen
+    if (player.x < 0) player.x = 0;
+    if (player.x > worldWidth - player.width) player.x = worldWidth - player.width;
+
+    // Gevallen in een gat
+    if (player.y > 800) {
+        gameOver();
+    }
+
+    // Camera volgt speler
+    const targetCameraX = player.x - SCREEN_CENTER;
+    cameraX = Math.max(0, Math.min(targetCameraX, worldWidth - BASE_WIDTH));
+
+    // Update vijanden
+    enemies.forEach(enemy => {
+        // Heen en weer bewegen
+        enemy.x += enemy.speed * enemy.direction;
+
+        if (enemy.x <= enemy.baseX - enemy.moveRange) {
+            enemy.direction = 1;
+        } else if (enemy.x >= enemy.baseX + enemy.moveRange) {
+            enemy.direction = -1;
+        }
+
+        // Walk animatie
+        enemy.walkTimer++;
+        if (enemy.walkTimer >= 10) {
+            enemy.walkTimer = 0;
+            enemy.walkFrame = (enemy.walkFrame + 1) % enemyWalkFrameCount;
+        }
+
+        // Collision met speler
+        if (checkCollision(player, enemy)) {
+            // Check of speler van boven komt (op vijand springt)
+            if (player.velocityY > 0 && player.y + player.height - player.velocityY <= enemy.y + 20) {
+                // Vijand verslagen!
+                enemy.defeated = true;
+                player.velocityY = player.jumpForce * 0.6; // Kleine bounce
+                score += 100;
+                scoreDisplay.textContent = `Score: ${score}`;
+                playEnemyDefeatSound();
+            } else if (!enemy.defeated) {
+                // Geraakt door vijand
+                gameOver();
+            }
+        }
+    });
+
+    // Verwijder verslagen vijanden
+    enemies = enemies.filter(e => !e.defeated);
+
+    // Munten verzamelen
+    coins.forEach(coin => {
+        if (!coin.collected && checkCoinCollision(player, coin)) {
+            coin.collected = true;
+            score += 50;
+            scoreDisplay.textContent = `Score: ${score}`;
+            playCoinSound();
+        }
+    });
+
+    // Update kanonnen en kanonskogels
+    cannons.forEach(cannon => {
+        cannon.fireTimer--;
+        if (cannon.fireTimer <= 0) {
+            cannon.fireTimer = cannon.fireRate;
+            cannonballs.push({
+                x: cannon.x + (cannon.direction > 0 ? cannon.width : -10),
+                y: cannon.y + cannon.height / 2 - 6,
+                width: 12,
+                height: 12,
+                velocityX: cannon.direction * 3
+            });
+        }
+    });
+
+    cannonballs = cannonballs.filter(ball => {
+        ball.x += ball.velocityX;
+
+        // Verwijder als buiten wereld
+        if (ball.x < -50 || ball.x > worldWidth + 50) return false;
+
+        // Collision met speler
+        if (checkCollision(player, ball)) {
+            gameOver();
+            return false;
+        }
+
+        return true;
+    });
+
+    // Vlag collision - level voltooid
+    if (flag && !flag.reached) {
+        const flagHitbox = { x: flag.x, y: flag.y - flag.height, width: flag.width, height: flag.height };
+        if (checkCollision(player, flagHitbox)) {
+            flag.reached = true;
+            levelComplete = true;
+            gameRunning = false;
+            playLevelCompleteSound();
+
+            if (currentLevel >= 3) {
+                gameWon = true;
+            }
+
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('poppiesHighScore', highScore);
+            }
+        }
+    }
+
+    levelDisplay.textContent = `Level: ${currentLevel}`;
+}
+
+function checkCollision(rect1, rect2) {
+    return rect1.x < rect2.x + rect2.width &&
+           rect1.x + rect1.width > rect2.x &&
+           rect1.y < rect2.y + rect2.height &&
+           rect1.y + rect1.height > rect2.y;
+}
+
+function checkCoinCollision(player, coin) {
+    const coinSize = 30;
+    return player.x < coin.x + coinSize &&
+           player.x + player.width > coin.x &&
+           player.y < coin.y + coinSize &&
+           player.y + player.height > coin.y;
+}
+
+// ============================================
+// TEKEN FUNCTIES
+// ============================================
+
+// Stabiele pseudo-random gebaseerd op seed
+function seededRandom(seed) {
+    const x = Math.sin(seed * 9999) * 9999;
+    return x - Math.floor(x);
+}
+
+// Doodle rechthoek met wiebelige randen (stabiel)
+function doodleRect(x, y, w, h, wobble = 3) {
+    const scale = getScale();
+    const wo = wobble * scale * 0.6;
+    const seed = Math.floor(x * 0.1 + y * 7);
+    ctx.beginPath();
+    ctx.moveTo(x + (seededRandom(seed) - 0.5) * wo, y + (seededRandom(seed + 1) - 0.5) * wo);
+    ctx.lineTo(x + w + (seededRandom(seed + 2) - 0.5) * wo, y + (seededRandom(seed + 3) - 0.5) * wo);
+    ctx.lineTo(x + w + (seededRandom(seed + 4) - 0.5) * wo, y + h + (seededRandom(seed + 5) - 0.5) * wo);
+    ctx.lineTo(x + (seededRandom(seed + 6) - 0.5) * wo, y + h + (seededRandom(seed + 7) - 0.5) * wo);
+    ctx.closePath();
+}
+
+// Doodle cirkel (stabiel)
+function doodleCircle(x, y, r, segments = 12) {
+    const seed = Math.floor(x * 0.1 + y * 7);
+    ctx.beginPath();
+    for (let i = 0; i <= segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        const wobble = r * 0.05 * Math.sin(i * 3 + seededRandom(seed + i) * 2);
+        const px = x + Math.cos(angle) * (r + wobble);
+        const py = y + Math.sin(angle) * (r + wobble);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+}
+
+function drawBackground() {
+    const scale = getScale();
+    const time = Date.now() / 1000;
+
+    // Zonnige lucht - effen cartoony kleur
+    ctx.fillStyle = '#87CEEB';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Cartoony wolken (parallax)
+    for (let i = 0; i < 5; i++) {
+        const baseX = (i * 350) % (BASE_WIDTH * 2);
+        const cloudX = ((baseX - cameraX * 0.15) % (BASE_WIDTH * 1.8) + BASE_WIDTH * 1.8) % (BASE_WIDTH * 1.8) * scale;
+        const cy = (60 + (i * 47) % 100) * scale;
+        const cloudSize = (40 + (i * 13) % 30) * scale;
+
+        // Wolk vulling
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(cloudX, cy, cloudSize, 0, Math.PI * 2);
+        ctx.arc(cloudX - cloudSize * 0.7, cy + cloudSize * 0.2, cloudSize * 0.6, 0, Math.PI * 2);
+        ctx.arc(cloudX + cloudSize * 0.7, cy + cloudSize * 0.1, cloudSize * 0.7, 0, Math.PI * 2);
+        ctx.arc(cloudX - cloudSize * 0.3, cy - cloudSize * 0.3, cloudSize * 0.5, 0, Math.PI * 2);
+        ctx.arc(cloudX + cloudSize * 0.4, cy - cloudSize * 0.25, cloudSize * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Dikke zwarte outline
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 3 * scale;
+        ctx.stroke();
+    }
+
+    // Cartoony zon (parallax)
+    const sunX = (200 - cameraX * 0.03) * scale;
+    const sunY = 90 * scale;
+    const sunR = 50 * scale;
+
+    // Zonnestralen
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 4 * scale;
+    for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2 + time * 0.5;
+        const innerR = sunR + 10 * scale;
+        const outerR = sunR + 30 * scale + Math.sin(time * 3 + i) * 5 * scale;
+        ctx.beginPath();
+        ctx.moveTo(sunX + Math.cos(angle) * innerR, sunY + Math.sin(angle) * innerR);
+        ctx.lineTo(sunX + Math.cos(angle) * outerR, sunY + Math.sin(angle) * outerR);
+        ctx.stroke();
+    }
+
+    // Zon
+    ctx.fillStyle = '#FFDD00';
+    doodleCircle(sunX, sunY, sunR);
+    ctx.fill();
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 4 * scale;
+    ctx.stroke();
+
+    // Zon gezichtje
+    ctx.fillStyle = '#222222';
+    ctx.beginPath();
+    ctx.arc(sunX - 15 * scale, sunY - 5 * scale, 5 * scale, 0, Math.PI * 2);
+    ctx.arc(sunX + 15 * scale, sunY - 5 * scale, 5 * scale, 0, Math.PI * 2);
+    ctx.fill();
+    // Glimlach
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 3 * scale;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY + 5 * scale, 20 * scale, 0.2, Math.PI - 0.2);
+    ctx.stroke();
+
+    // Zee op achtergrond
+    const seaY = canvas.height * 0.65;
+    ctx.fillStyle = '#4FC3F7';
+    ctx.fillRect(0, seaY, canvas.width, canvas.height - seaY);
+
+    // Dikke lijn tussen lucht en zee
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 4 * scale;
+    ctx.beginPath();
+    ctx.moveTo(0, seaY);
+    ctx.lineTo(canvas.width, seaY);
+    ctx.stroke();
+
+    // Cartoony golven
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 3 * scale;
+    for (let row = 0; row < 3; row++) {
+        ctx.beginPath();
+        const yBase = seaY + 30 * scale + row * 40 * scale;
+        for (let x = 0; x < canvas.width + 50; x += 40 * scale) {
+            const waveOffset = cameraX * 0.2 + row * 100 + time * 50;
+            const xPos = x - (waveOffset * scale) % (40 * scale);
+            ctx.moveTo(xPos, yBase);
+            ctx.quadraticCurveTo(xPos + 20 * scale, yBase - 15 * scale, xPos + 40 * scale, yBase);
+        }
+        ctx.stroke();
+    }
+}
+
+function drawPlatform(platform) {
+    const scale = getScale();
+    const screenX = (platform.x - cameraX) * scale;
+
+    // Skip als buiten scherm
+    if (screenX + platform.width * scale < 0 || screenX > canvas.width) return;
+
+    const py = platform.y * scale;
+    const pw = platform.width * scale;
+    const ph = platform.height * scale;
+
+    ctx.save();
+
+    if (platform.type === 'floor') {
+        // Cartoony vloer/dek van de boot
+        ctx.fillStyle = '#DEB887';
+        doodleRect(screenX, py, pw, ph, 2);
+        ctx.fill();
+
+        // Dikke zwarte outline
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 4 * scale;
+        ctx.stroke();
+
+        // Horizontale houten planken - doodle stijl (stabiel)
+        ctx.strokeStyle = '#8B4513';
+        ctx.lineWidth = 2 * scale;
+        for (let i = 20 * scale; i < ph; i += 25 * scale) {
+            const plankSeed = Math.floor(platform.x + i);
+            ctx.beginPath();
+            ctx.moveTo(screenX + 5, py + i + (seededRandom(plankSeed) - 0.5) * 2);
+            ctx.lineTo(screenX + pw - 5, py + i + (seededRandom(plankSeed + 1) - 0.5) * 2);
+            ctx.stroke();
+        }
+
+        // Spijkers/stipjes voor extra detail
+        ctx.fillStyle = '#222222';
+        for (let i = 30 * scale; i < pw; i += 80 * scale) {
+            ctx.beginPath();
+            ctx.arc(screenX + i, py + 10 * scale, 3 * scale, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    } else {
+        // Cartoony zwevend platform
+        if (platform.breakable) {
+            ctx.fillStyle = '#F4A460';
+        } else {
+            ctx.fillStyle = '#DEB887';
+        }
+
+        // Wiebelige rechthoek
+        doodleRect(screenX, py, pw, ph, 3);
+        ctx.fill();
+
+        // Dikke zwarte outline
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 4 * scale;
+        ctx.stroke();
+
+        // Simpele houtnerf lijntjes
+        ctx.strokeStyle = '#A0522D';
+        ctx.lineWidth = 2 * scale;
+        for (let i = 20 * scale; i < pw - 10; i += 35 * scale) {
+            ctx.beginPath();
+            ctx.moveTo(screenX + i, py + 5 * scale);
+            ctx.lineTo(screenX + i + 5 * scale, py + ph - 5 * scale);
+            ctx.stroke();
+        }
+
+        // Scheuren voor breekbare platforms - zigzag stijl
+        if (platform.breakable) {
+            ctx.strokeStyle = '#222222';
+            ctx.lineWidth = 2 * scale;
+            // Scheur 1
+            ctx.beginPath();
+            ctx.moveTo(screenX + pw * 0.3, py);
+            ctx.lineTo(screenX + pw * 0.35, py + ph * 0.3);
+            ctx.lineTo(screenX + pw * 0.28, py + ph * 0.6);
+            ctx.lineTo(screenX + pw * 0.33, py + ph);
+            ctx.stroke();
+            // Scheur 2
+            ctx.beginPath();
+            ctx.moveTo(screenX + pw * 0.7, py);
+            ctx.lineTo(screenX + pw * 0.65, py + ph * 0.4);
+            ctx.lineTo(screenX + pw * 0.72, py + ph);
+            ctx.stroke();
+        }
+    }
+
+    ctx.restore();
+}
+
+function drawPlayer() {
+    const scale = getScale();
+    ctx.save();
+
+    // Collision box positie
+    const screenX = (player.x - cameraX) * scale;
+    const py = player.y * scale;
+    const pw = player.width * scale;
+    const ph = player.height * scale;
+
+    // Teken grootte (groter dan collision box)
+    const drawW = player.drawWidth * scale;
+    const drawH = player.drawHeight * scale;
+
+    // Centreer horizontaal op collision box, voeten op onderkant collision box
+    const centerX = screenX + pw / 2;
+    const bottomY = py + ph;
+
+    if (playerImageLoaded) {
+        ctx.translate(centerX, bottomY - drawH / 2);
+
+        if (!player.facingRight) {
+            ctx.scale(-1, 1);
+        }
+
+        // Salto rotatie
+        if (player.doingSalto) {
+            ctx.rotate(player.rotation);
+        }
+
+        // Kies de juiste afbeelding
+        let currentImage = playerImage;
+        let useSquashStretch = false;
+
+        // In de lucht
+        if (!player.grounded) {
+            if (jumpImageLoaded && jumpImage.loaded) {
+                currentImage = jumpImage;
+            }
+        }
+        // Aan het lopen
+        else if (Math.abs(player.velocityX) > 0.5) {
+            const walkImg = walkFrames[player.walkFrame];
+            if (walkFramesLoaded >= walkFrameCount && walkImg && walkImg.loaded) {
+                currentImage = walkImg;
+            } else {
+                // Fallback: squash & stretch animatie
+                useSquashStretch = true;
+            }
+        }
+
+        // Teken met squash/stretch als geen walk frames
+        if (useSquashStretch) {
+            const stretch = 1 + Math.sin(Date.now() / 60) * 0.08;
+            const squash = 1 / stretch;
+            ctx.scale(squash, stretch);
+            const bounce = Math.abs(Math.sin(Date.now() / 80)) * 6 * scale;
+            ctx.drawImage(currentImage, -drawW/2, -drawH/2 - bounce, drawW, drawH);
+        } else {
+            ctx.drawImage(currentImage, -drawW/2, -drawH/2, drawW, drawH);
+        }
+    } else {
+        // Fallback - grotere tekening
+        ctx.fillStyle = '#4ecdc4';
+        ctx.beginPath();
+        ctx.ellipse(centerX, bottomY - drawH/2, drawW/2, drawH/2, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
+function drawEnemy(enemy) {
+    const scale = getScale();
+    const screenX = (enemy.x - cameraX) * scale;
+
+    // Skip als buiten scherm
+    if (screenX + enemy.width * scale < -50 || screenX > canvas.width + 50) return;
+
+    ctx.save();
+
+    const ey = enemy.y * scale;
+    const ew = enemy.width * scale;
+    const eh = enemy.height * scale;
+
+    // Teken grootte (zelfde als speler)
+    const drawW = (enemy.drawWidth || enemy.width) * scale;
+    const drawH = (enemy.drawHeight || enemy.height) * scale;
+
+    // Centreer horizontaal op collision box, voeten op onderkant collision box
+    const centerX = screenX + ew / 2;
+    const bottomY = ey + eh;
+
+    ctx.translate(centerX, bottomY - drawH / 2);
+
+    // Kijk richting beweging (sprites kijken standaard naar links)
+    if (enemy.direction > 0) {
+        ctx.scale(-1, 1);
+    }
+
+    // Walk animatie frame kiezen
+    const enemyImg = enemyWalkFrames[enemy.walkFrame];
+    const hasEnemyFrames = enemyWalkFramesLoaded >= enemyWalkFrameCount && enemyImg && enemyImg.loaded;
+
+    if (hasEnemyFrames) {
+        ctx.drawImage(enemyImg, -drawW/2, -drawH/2, drawW, drawH);
+    } else if (playerImageLoaded) {
+        // Fallback: rode poppy
+        ctx.filter = 'hue-rotate(140deg) saturate(2)';
+        ctx.drawImage(playerImage, -drawW/2, -drawH/2, drawW, drawH);
+        ctx.filter = 'none';
+    } else {
+        // Fallback: rode cirkel met boze ogen
+        ctx.fillStyle = '#e74c3c';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, drawW/2, drawH/2, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.ellipse(-8 * scale, -10 * scale, 8 * scale, 6 * scale, 0, 0, Math.PI * 2);
+        ctx.ellipse(8 * scale, -10 * scale, 8 * scale, 6 * scale, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(-6 * scale, -8 * scale, 4 * scale, 0, Math.PI * 2);
+        ctx.arc(10 * scale, -8 * scale, 4 * scale, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 3 * scale;
+        ctx.beginPath();
+        ctx.moveTo(-15 * scale, -18 * scale);
+        ctx.lineTo(-3 * scale, -14 * scale);
+        ctx.moveTo(15 * scale, -18 * scale);
+        ctx.lineTo(3 * scale, -14 * scale);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+function drawDebris() {
+    const scale = getScale();
+
+    debris.forEach(d => {
+        const screenX = (d.x - cameraX) * scale;
+        if (screenX < -50 || screenX > canvas.width + 50) return;
+
+        ctx.save();
+        ctx.translate(screenX, d.y * scale);
+        ctx.rotate(d.rotation);
+
+        // Fade out
+        ctx.globalAlpha = d.life / 60;
+
+        // Houten brokstuk
+        ctx.fillStyle = '#A67C52';
+        ctx.strokeStyle = '#5D3A1A';
+        ctx.lineWidth = 1 * scale;
+
+        const size = d.size * scale;
+        ctx.fillRect(-size/2, -size/2, size, size);
+        ctx.strokeRect(-size/2, -size/2, size, size);
+
+        ctx.restore();
+    });
+
+    ctx.globalAlpha = 1;
+}
+
+function drawCoin(coin) {
+    if (coin.collected) return;
+
+    const scale = getScale();
+    const screenX = (coin.x - cameraX) * scale;
+
+    if (screenX < -50 || screenX > canvas.width + 50) return;
+
+    ctx.save();
+
+    const cy = coin.y * scale;
+    const time = Date.now() / 400;
+    const bounce = Math.sin(time * 3) * 3 * scale;
+
+    ctx.translate(screenX + 15 * scale, cy + 15 * scale + bounce);
+
+    // Cartoony munt met dikke outline
+    ctx.fillStyle = '#FFD700';
+    doodleCircle(0, 0, 16 * scale);
+    ctx.fill();
+
+    // Dikke zwarte outline
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 4 * scale;
+    ctx.stroke();
+
+    // Dollar/ster teken in het midden
+    ctx.fillStyle = '#222222';
+    ctx.font = `bold ${18 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('★', 0, 1 * scale);
+
+    ctx.restore();
+}
+
+function drawCannon(cannon) {
+    const scale = getScale();
+    const screenX = (cannon.x - cameraX) * scale;
+
+    // Skip als buiten scherm
+    if (screenX + cannon.width * scale < -50 || screenX > canvas.width + 50) return;
+
+    ctx.save();
+
+    const cy = cannon.y * scale;
+    const cw = cannon.width * scale;
+    const ch = cannon.height * scale;
+
+    // Wielen
+    const wheelR = 10 * scale;
+    ctx.fillStyle = '#5D3A1A';
+    doodleCircle(screenX + 12 * scale, cy + ch + 2 * scale, wheelR);
+    ctx.fill();
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 3 * scale;
+    ctx.stroke();
+
+    doodleCircle(screenX + cw - 12 * scale, cy + ch + 2 * scale, wheelR);
+    ctx.fill();
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 3 * scale;
+    ctx.stroke();
+
+    // Wielspaken
+    ctx.strokeStyle = '#3E2310';
+    ctx.lineWidth = 2 * scale;
+    for (let i = 0; i < 4; i++) {
+        const angle = (i / 4) * Math.PI * 2;
+        const wx1 = screenX + 12 * scale;
+        const wy1 = cy + ch + 2 * scale;
+        ctx.beginPath();
+        ctx.moveTo(wx1, wy1);
+        ctx.lineTo(wx1 + Math.cos(angle) * wheelR * 0.8, wy1 + Math.sin(angle) * wheelR * 0.8);
+        ctx.stroke();
+
+        const wx2 = screenX + cw - 12 * scale;
+        ctx.beginPath();
+        ctx.moveTo(wx2, wy1);
+        ctx.lineTo(wx2 + Math.cos(angle) * wheelR * 0.8, wy1 + Math.sin(angle) * wheelR * 0.8);
+        ctx.stroke();
+    }
+
+    // Kanonlichaam (doodle rechthoek)
+    ctx.fillStyle = '#444444';
+    doodleRect(screenX + 5 * scale, cy + 5 * scale, cw - 10 * scale, ch - 8 * scale, 3);
+    ctx.fill();
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 4 * scale;
+    ctx.stroke();
+
+    // Kanonloop (uitstekend in schietrichting)
+    const barrelLength = 25 * scale;
+    const barrelH = 14 * scale;
+    const barrelY = cy + ch / 2 - barrelH / 2;
+    let barrelX;
+    if (cannon.direction > 0) {
+        barrelX = screenX + cw - 8 * scale;
+    } else {
+        barrelX = screenX + 8 * scale - barrelLength;
+    }
+    ctx.fillStyle = '#333333';
+    doodleRect(barrelX, barrelY, barrelLength, barrelH, 2);
+    ctx.fill();
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 3 * scale;
+    ctx.stroke();
+
+    // Lont/opening markering
+    const openingX = cannon.direction > 0 ? barrelX + barrelLength : barrelX;
+    ctx.fillStyle = '#111111';
+    ctx.beginPath();
+    ctx.arc(openingX, barrelY + barrelH / 2, 4 * scale, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Decoratieve ring op het kanon
+    ctx.strokeStyle = '#8B7355';
+    ctx.lineWidth = 3 * scale;
+    ctx.beginPath();
+    ctx.moveTo(screenX + cw * 0.35, cy + 5 * scale);
+    ctx.lineTo(screenX + cw * 0.35, cy + ch - 3 * scale);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(screenX + cw * 0.65, cy + 5 * scale);
+    ctx.lineTo(screenX + cw * 0.65, cy + ch - 3 * scale);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function drawCannonball(ball) {
+    const scale = getScale();
+    const screenX = (ball.x - cameraX) * scale;
+
+    if (screenX < -50 || screenX > canvas.width + 50) return;
+
+    ctx.save();
+
+    const by = ball.y * scale;
+    const br = 6 * scale;
+
+    // Zwarte kanonskogel
+    ctx.fillStyle = '#222222';
+    doodleCircle(screenX + br, by + br, br);
+    ctx.fill();
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2 * scale;
+    ctx.stroke();
+
+    // Glans highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.beginPath();
+    ctx.arc(screenX + br - 2 * scale, by + br - 2 * scale, 2 * scale, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+}
+
+function drawFlag() {
+    if (!flag) return;
+
+    const scale = getScale();
+    const screenX = (flag.x - cameraX) * scale;
+    const time = Date.now() / 1000;
+
+    if (screenX + flag.width * scale < -50 || screenX > canvas.width + 50) return;
+
+    ctx.save();
+
+    const baseY = flag.y * scale;
+    const poleHeight = flag.height * scale;
+    const poleX = screenX + 15 * scale;
+
+    // Houten paal (doodle-stijl)
+    ctx.fillStyle = '#8B4513';
+    doodleRect(poleX - 5 * scale, baseY - poleHeight, 10 * scale, poleHeight, 2);
+    ctx.fill();
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 3 * scale;
+    ctx.stroke();
+
+    // Bol bovenop de paal
+    ctx.fillStyle = '#FFD700';
+    doodleCircle(poleX, baseY - poleHeight, 8 * scale);
+    ctx.fill();
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 3 * scale;
+    ctx.stroke();
+
+    // Piraten-vlag (wapperend)
+    const flagW = 50 * scale;
+    const flagH = 35 * scale;
+    const flagStartX = poleX + 3 * scale;
+    const flagStartY = baseY - poleHeight + 10 * scale;
+
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.moveTo(flagStartX, flagStartY);
+
+    // Wapperende bovenkant
+    const wave1 = Math.sin(time * 3) * 4 * scale;
+    const wave2 = Math.sin(time * 3 + 1) * 3 * scale;
+    ctx.quadraticCurveTo(flagStartX + flagW * 0.5, flagStartY + wave1, flagStartX + flagW, flagStartY + wave2);
+
+    // Wapperende onderkant
+    const wave3 = Math.sin(time * 3 + 2) * 4 * scale;
+    ctx.lineTo(flagStartX + flagW + wave3, flagStartY + flagH);
+    ctx.quadraticCurveTo(flagStartX + flagW * 0.5, flagStartY + flagH + wave1 * 0.5, flagStartX, flagStartY + flagH);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 3 * scale;
+    ctx.stroke();
+
+    // Doodskop op de vlag
+    const skullX = flagStartX + flagW * 0.45 + wave1 * 0.3;
+    const skullY = flagStartY + flagH * 0.45;
+    const skullSize = 8 * scale;
+
+    // Schedel
+    ctx.fillStyle = '#FFFFFF';
+    doodleCircle(skullX, skullY, skullSize);
+    ctx.fill();
+
+    // Ogen
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.arc(skullX - 3 * scale, skullY - 1 * scale, 2 * scale, 0, Math.PI * 2);
+    ctx.arc(skullX + 3 * scale, skullY - 1 * scale, 2 * scale, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Gekruiste botten onder schedel
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 2 * scale;
+    ctx.beginPath();
+    ctx.moveTo(skullX - 6 * scale, skullY + skullSize + 2 * scale);
+    ctx.lineTo(skullX + 6 * scale, skullY + skullSize + 8 * scale);
+    ctx.moveTo(skullX + 6 * scale, skullY + skullSize + 2 * scale);
+    ctx.lineTo(skullX - 6 * scale, skullY + skullSize + 8 * scale);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function drawLevelComplete() {
+    const scale = getScale();
+    const time = Date.now() / 1000;
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const boxW = 500 * scale;
+    const boxH = 320 * scale;
+    const boxX = canvas.width / 2 - boxW / 2;
+    const boxY = canvas.height / 2 - boxH / 2;
+
+    ctx.fillStyle = '#FFF8DC';
+    doodleRect(boxX, boxY, boxW, boxH, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 5 * scale;
+    ctx.stroke();
+
+    // Wiebelige titel
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2 - 90 * scale);
+    ctx.rotate(Math.sin(time * 2) * 0.03);
+
+    ctx.fillStyle = '#222222';
+    ctx.font = `bold ${44 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`Level ${currentLevel} Voltooid!`, 3 * scale, 3 * scale);
+    ctx.fillStyle = '#4CAF50';
+    ctx.fillText(`Level ${currentLevel} Voltooid!`, 0, 0);
+    ctx.restore();
+
+    // Score
+    ctx.fillStyle = '#FFD700';
+    ctx.font = `${60 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.textAlign = 'center';
+    ctx.fillText('⭐', canvas.width / 2, canvas.height / 2 - 5 * scale);
+
+    ctx.fillStyle = '#222222';
+    ctx.font = `bold ${22 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2 + 40 * scale);
+
+    // Volgende level prompt
+    const blink = Math.sin(time * 4) > 0;
+    if (blink) {
+        const btnW = 340 * scale;
+        const btnH = 45 * scale;
+        const btnX = canvas.width / 2 - btnW / 2;
+        const btnY = canvas.height / 2 + 65 * scale;
+
+        ctx.fillStyle = '#90EE90';
+        doodleRect(btnX, btnY, btnW, btnH, 4);
+        ctx.fill();
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 3 * scale;
+        ctx.stroke();
+
+        ctx.fillStyle = '#222222';
+        ctx.font = `bold ${20 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.textBaseline = 'middle';
+        ctx.fillText('SPATIE = Volgend Level', canvas.width / 2, btnY + btnH / 2);
+        ctx.textBaseline = 'alphabetic';
+    }
+
+    // Decoraties
+    ctx.font = `${30 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.fillText('🏴‍☠️', boxX + 35 * scale, boxY + 40 * scale);
+    ctx.fillText('🎉', boxX + boxW - 45 * scale, boxY + 40 * scale);
+}
+
+function drawGameWon() {
+    const scale = getScale();
+    const time = Date.now() / 1000;
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const boxW = 500 * scale;
+    const boxH = 350 * scale;
+    const boxX = canvas.width / 2 - boxW / 2;
+    const boxY = canvas.height / 2 - boxH / 2;
+
+    ctx.fillStyle = '#FFF8DC';
+    doodleRect(boxX, boxY, boxW, boxH, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 5 * scale;
+    ctx.stroke();
+
+    // Wiebelige titel
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2 - 100 * scale);
+    ctx.rotate(Math.sin(time * 2) * 0.04);
+
+    ctx.fillStyle = '#222222';
+    ctx.font = `bold ${52 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.textAlign = 'center';
+    ctx.fillText('GEWONNEN!', 3 * scale, 3 * scale);
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText('GEWONNEN!', 0, 0);
+    ctx.restore();
+
+    // Subtitel
+    ctx.fillStyle = '#222222';
+    ctx.font = `bold ${22 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.textAlign = 'center';
+    ctx.fillText('Alle levels voltooid!', canvas.width / 2, canvas.height / 2 - 40 * scale);
+
+    // Score
+    ctx.fillStyle = '#FFD700';
+    ctx.font = `${60 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.fillText('🏆', canvas.width / 2, canvas.height / 2 + 20 * scale);
+
+    ctx.fillStyle = '#222222';
+    ctx.font = `bold ${26 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.fillText(`Totaalscore: ${score}`, canvas.width / 2, canvas.height / 2 + 60 * scale);
+
+    if (score >= highScore && score > 0) {
+        ctx.fillStyle = '#FF6B6B';
+        ctx.font = `bold ${20 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.fillText('NIEUW RECORD!', canvas.width / 2, canvas.height / 2 + 90 * scale);
+    } else {
+        ctx.fillStyle = '#666666';
+        ctx.font = `${18 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.fillText(`Best: ${highScore}`, canvas.width / 2, canvas.height / 2 + 90 * scale);
+    }
+
+    // Opnieuw spelen
+    const blink = Math.sin(time * 4) > 0;
+    if (blink) {
+        const btnW = 320 * scale;
+        const btnH = 45 * scale;
+        const btnX = canvas.width / 2 - btnW / 2;
+        const btnY = canvas.height / 2 + 110 * scale;
+
+        ctx.fillStyle = '#90EE90';
+        doodleRect(btnX, btnY, btnW, btnH, 4);
+        ctx.fill();
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 3 * scale;
+        ctx.stroke();
+
+        ctx.fillStyle = '#222222';
+        ctx.font = `bold ${18 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.textBaseline = 'middle';
+        ctx.fillText('SPATIE = Opnieuw Spelen', canvas.width / 2, btnY + btnH / 2);
+        ctx.textBaseline = 'alphabetic';
+    }
+
+    // Decoraties
+    ctx.font = `${30 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.fillText('⚓', boxX + 30 * scale, boxY + 40 * scale);
+    ctx.fillText('💰', boxX + boxW - 40 * scale, boxY + 40 * scale);
+    ctx.fillText('🏴‍☠️', boxX + 30 * scale, boxY + boxH - 20 * scale);
+    ctx.fillText('⭐', boxX + boxW - 40 * scale, boxY + boxH - 20 * scale);
+}
+
+function drawStartScreen() {
+    const scale = getScale();
+    const time = Date.now() / 1000;
+
+    // Semi-transparante achtergrond
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Grote doodle box voor titel
+    const boxW = 500 * scale;
+    const boxH = 350 * scale;
+    const boxX = canvas.width/2 - boxW/2;
+    const boxY = canvas.height/2 - boxH/2 - 20 * scale;
+
+    ctx.fillStyle = '#FFF8DC';
+    doodleRect(boxX, boxY, boxW, boxH, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 5 * scale;
+    ctx.stroke();
+
+    // Wiebelige titel
+    ctx.save();
+    ctx.translate(canvas.width/2, canvas.height/2 - 100 * scale);
+    ctx.rotate(Math.sin(time * 2) * 0.03);
+
+    ctx.fillStyle = '#222222';
+    ctx.font = `bold ${52 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.textAlign = 'center';
+    ctx.fillText('De Gekke Poppies', 3 * scale, 3 * scale);
+    ctx.fillStyle = '#FF6B6B';
+    ctx.fillText('De Gekke Poppies', 0, 0);
+
+    ctx.restore();
+
+    // Payoff
+    ctx.save();
+    ctx.translate(canvas.width/2, canvas.height/2 - 45 * scale);
+    ctx.rotate(1.5 * Math.PI / 180);
+    ctx.fillStyle = '#8B4513';
+    ctx.font = `italic ${20 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.textAlign = 'center';
+    ctx.fillText('Door Dex', 0, 0);
+    ctx.restore();
+
+    // Knipperend "druk spatie" met doodle box eromheen
+    const blink = Math.sin(time * 4) > 0;
+    if (blink) {
+        const btnW = 320 * scale;
+        const btnH = 45 * scale;
+        const btnX = canvas.width/2 - btnW/2;
+        const btnY = canvas.height/2 + 10 * scale;
+
+        ctx.fillStyle = '#90EE90';
+        doodleRect(btnX, btnY, btnW, btnH, 4);
+        ctx.fill();
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 3 * scale;
+        ctx.stroke();
+
+        ctx.fillStyle = '#222222';
+        ctx.font = `bold ${20 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.textBaseline = 'middle';
+        ctx.fillText('>>> DRUK SPATIE <<<', canvas.width/2, btnY + btnH / 2);
+        ctx.textBaseline = 'alphabetic';
+    }
+
+    // Besturing info
+    ctx.fillStyle = '#666666';
+    ctx.font = `${16 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.fillText('← → = Lopen    SPATIE = Springen', canvas.width/2, canvas.height/2 + 90 * scale);
+    ctx.fillText('Spring op vijanden om ze te verslaan!', canvas.width/2, canvas.height/2 + 115 * scale);
+
+    // Kleine decoraties
+    ctx.font = `${30 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.fillText('⚓', boxX + 30 * scale, boxY + 40 * scale);
+    ctx.fillText('💰', boxX + boxW - 40 * scale, boxY + 40 * scale);
+    ctx.fillText('🏴‍☠️', boxX + 30 * scale, boxY + boxH - 20 * scale);
+    ctx.fillText('⭐', boxX + boxW - 40 * scale, boxY + boxH - 20 * scale);
+}
+
+function drawGameOver() {
+    const scale = getScale();
+    const time = Date.now() / 1000;
+
+    // Semi-transparante achtergrond
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Doodle box
+    const boxW = 450 * scale;
+    const boxH = 300 * scale;
+    const boxX = canvas.width/2 - boxW/2;
+    const boxY = canvas.height/2 - boxH/2;
+
+    ctx.fillStyle = '#FFF8DC';
+    doodleRect(boxX, boxY, boxW, boxH, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#222222';
+    ctx.lineWidth = 5 * scale;
+    ctx.stroke();
+
+    // Wiebelige Game Over titel
+    ctx.save();
+    ctx.translate(canvas.width/2, canvas.height/2 - 80 * scale);
+    ctx.rotate(Math.sin(time * 3) * 0.05);
+
+    ctx.fillStyle = '#222222';
+    ctx.font = `bold ${52 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.textAlign = 'center';
+    ctx.fillText('GAME OVER', 3 * scale, 3 * scale);
+    ctx.fillStyle = '#FF6B6B';
+    ctx.fillText('GAME OVER', 0, 0);
+    ctx.restore();
+
+    // Score in een sterretje
+    ctx.fillStyle = '#FFD700';
+    ctx.font = `${60 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.fillText('⭐', canvas.width/2, canvas.height/2 + 5 * scale);
+
+    ctx.fillStyle = '#222222';
+    ctx.font = `bold ${22 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.fillText(`${score}`, canvas.width/2, canvas.height/2 + 12 * scale);
+
+    if (score >= highScore && score > 0) {
+        ctx.fillStyle = '#FF6B6B';
+        ctx.font = `bold ${20 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.fillText('NIEUW RECORD!', canvas.width/2, canvas.height/2 + 55 * scale);
+    } else {
+        ctx.fillStyle = '#666666';
+        ctx.font = `${18 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.fillText(`Best: ${highScore}`, canvas.width/2, canvas.height/2 + 55 * scale);
+    }
+
+    // Retry knop
+    const blink = Math.sin(time * 4) > 0;
+    if (blink) {
+        const btnW = 280 * scale;
+        const btnH = 40 * scale;
+        const btnX = canvas.width/2 - btnW/2;
+        const btnY = canvas.height/2 + 80 * scale;
+
+        ctx.fillStyle = '#90EE90';
+        doodleRect(btnX, btnY, btnW, btnH, 4);
+        ctx.fill();
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 3 * scale;
+        ctx.stroke();
+
+        ctx.fillStyle = '#222222';
+        ctx.font = `bold ${18 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.textBaseline = 'middle';
+        ctx.fillText('SPATIE = Opnieuw', canvas.width/2, btnY + btnH / 2);
+        ctx.textBaseline = 'alphabetic';
+    }
+
+    // Verdrietige emoji's
+    ctx.font = `${25 * scale}px Patrick Hand, Comic Sans MS`;
+    ctx.fillText('😢', boxX + 35 * scale, boxY + 40 * scale);
+    ctx.fillText('💀', boxX + boxW - 45 * scale, boxY + 40 * scale);
+}
+
+// ============================================
+// MAIN LOOP
+// ============================================
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    drawBackground();
+
+    // Teken platforms
+    platforms.forEach(drawPlatform);
+
+    // Teken debris (brokstukken)
+    drawDebris();
+
+    // Teken munten
+    coins.forEach(drawCoin);
+
+    // Teken kanonnen
+    cannons.forEach(drawCannon);
+
+    // Teken kanonskogels
+    cannonballs.forEach(drawCannonball);
+
+    // Teken vlag
+    drawFlag();
+
+    // Teken vijanden
+    enemies.forEach(drawEnemy);
+
+    // Teken speler
+    drawPlayer();
+
+    if (!gameStarted) {
+        drawStartScreen();
+    } else if (gameWon) {
+        drawGameWon();
+    } else if (levelComplete) {
+        drawLevelComplete();
+    } else if (!gameRunning) {
+        drawGameOver();
+    }
+}
+
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+// ============================================
+// START
+// ============================================
+resizeCanvas();
+scoreDisplay.textContent = 'Score: 0';
+levelDisplay.textContent = `Level: ${currentLevel}`;
+gameLoop();
+
+canvas.setAttribute('tabindex', '0');
+canvas.focus();

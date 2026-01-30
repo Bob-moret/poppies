@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poppies - Piraten Avontuur</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container" id="gameContainer">
+        <div class="game-title">
+            <h1>De Gekke Poppies</h1>
+            <span class="payoff">Door Dex</span>
+        </div>
+        <div class="game-header">
+            <div class="score-display">
+                <span id="scoreDisplay">Munten: 0</span>
+                <span id="levelDisplay">Level: 1</span>
+            </div>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+        <div class="controls-info">
+            <p><strong>Besturing:</strong> ← → bewegen | SPATIE springen | Verzamel goud!</p>
+        </div>
+        <button id="restartBtn" class="restart-btn" style="display: none;">Opnieuw Spelen</button>
+        <button id="fullscreenBtn" class="fullscreen-btn">Volledig Scherm</button>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
