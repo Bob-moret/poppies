@@ -228,84 +228,76 @@ h1::after {
     display: none;
 }
 
-/* Touch controls - alleen zichtbaar op touch devices */
-.touch-controls {
+/* Touch controls - overlay aan zijkanten van het scherm */
+.touch-zone {
     display: none;
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
     z-index: 1000;
-    pointer-events: none;
-    padding: 20px;
-    justify-content: space-between;
-    align-items: flex-end;
+    bottom: 30px;
+    gap: 16px;
+    align-items: center;
 }
 
-.touch-left,
-.touch-right {
-    display: flex;
-    gap: 12px;
-    pointer-events: auto;
+.touch-zone-left {
+    left: 20px;
+    flex-direction: row;
+}
+
+.touch-zone-right {
+    right: 20px;
 }
 
 .touch-btn {
-    width: 70px;
-    height: 70px;
+    width: 72px;
+    height: 72px;
     border-radius: 50%;
-    border: 3px solid #2d1810;
-    background: rgba(250, 240, 220, 0.7);
+    border: 3px solid rgba(45, 24, 16, 0.6);
+    background: rgba(250, 240, 220, 0.65);
     color: #2d1810;
     font-size: 1.8em;
     font-family: 'Patrick Hand', 'Comic Sans MS', cursive;
     font-weight: bold;
     cursor: pointer;
-    box-shadow: 2px 2px 0 rgba(45, 24, 16, 0.4);
+    box-shadow: 2px 2px 0 rgba(45, 24, 16, 0.3);
     -webkit-user-select: none;
     user-select: none;
+    -webkit-touch-callout: none;
     touch-action: manipulation;
     display: flex;
     align-items: center;
     justify-content: center;
     line-height: 1;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .touch-btn:active,
 .touch-btn.active {
     background: rgba(45, 24, 16, 0.6);
     color: #faf0dc;
-    transform: scale(0.93);
+    transform: scale(0.9);
     box-shadow: none;
 }
 
 .touch-btn-jump {
     width: 80px;
     height: 80px;
-    font-size: 2em;
-    background: rgba(45, 24, 16, 0.55);
+    font-size: 2.2em;
+    background: rgba(45, 24, 16, 0.5);
     color: #faf0dc;
 }
 
 .touch-btn-jump:active,
 .touch-btn-jump.active {
     background: rgba(45, 24, 16, 0.8);
+    transform: scale(0.9);
 }
 
 /* Toon touch controls op touch devices */
-@media (pointer: coarse) {
-    .touch-controls {
+@media (pointer: coarse), (hover: none) {
+    .touch-zone {
         display: flex;
     }
     .controls-info {
         display: none;
     }
-}
-
-/* Fullscreen touch controls */
-.game-container:fullscreen .touch-controls,
-.game-container:-webkit-full-screen .touch-controls {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
 }
