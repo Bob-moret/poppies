@@ -96,6 +96,7 @@ function initAudio() {
 
 // Poing geluid bij springen
 function playJumpSound() {
+    initAudio();
     if (!audioContext) return;
 
     const oscillator = audioContext.createOscillator();
@@ -118,6 +119,7 @@ function playJumpSound() {
 
 // Munt verzamel geluid
 function playCoinSound() {
+    initAudio();
     if (!audioContext) return;
 
     const oscillator = audioContext.createOscillator();
@@ -139,6 +141,7 @@ function playCoinSound() {
 
 // Vijand verslagen geluid
 function playEnemyDefeatSound() {
+    initAudio();
     if (!audioContext) return;
 
     const oscillator = audioContext.createOscillator();
@@ -160,6 +163,7 @@ function playEnemyDefeatSound() {
 
 // Game over geluid
 function playGameOverSound() {
+    initAudio();
     if (!audioContext) return;
 
     const oscillator = audioContext.createOscillator();
@@ -181,6 +185,7 @@ function playGameOverSound() {
 
 // Platform breek geluid
 function playBreakSound() {
+    initAudio();
     if (!audioContext) return;
 
     const oscillator = audioContext.createOscillator();
@@ -202,6 +207,7 @@ function playBreakSound() {
 
 // Level voltooid geluid - vrolijk oplopend melodietje
 function playLevelCompleteSound() {
+    initAudio();
     if (!audioContext) return;
 
     const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
@@ -499,6 +505,56 @@ document.addEventListener('keyup', (e) => {
 
 // Touch support
 let touchLeft = false, touchRight = false;
+
+// Touch button controls (iPad/tablet)
+const touchBtnLeft = document.getElementById('touchBtnLeft');
+const touchBtnRight = document.getElementById('touchBtnRight');
+const touchBtnJump = document.getElementById('touchBtnJump');
+
+function handleTouchBtn(btn, onStart, onEnd) {
+    btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        btn.classList.add('active');
+        onStart();
+    });
+    btn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        btn.classList.remove('active');
+        onEnd();
+    });
+    btn.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        btn.classList.remove('active');
+        onEnd();
+    });
+}
+
+handleTouchBtn(touchBtnLeft,
+    () => { touchLeft = true; },
+    () => { touchLeft = false; }
+);
+handleTouchBtn(touchBtnRight,
+    () => { touchRight = true; },
+    () => { touchRight = false; }
+);
+handleTouchBtn(touchBtnJump,
+    () => {
+        if (!gameStarted) { startGame(); return; }
+        if (levelComplete && !gameWon) { nextLevel(); return; }
+        if (gameWon) { restartGame(); return; }
+        if (!gameRunning) { restartGame(); return; }
+        if (player.grounded) {
+            player.velocityY = player.jumpForce;
+            player.grounded = false;
+            playJumpSound();
+        }
+    },
+    () => {}
+);
+
+// Canvas touch fallback (voor devices zonder zichtbare knoppen)
 canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
     if (!gameStarted) { startGame(); return; }
