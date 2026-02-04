@@ -80,6 +80,13 @@ for (let i = 1; i <= enemyWalkFrameCount; i++) {
     enemyWalkFrames.push(img);
 }
 
+// Kanon sprite
+const cannonImage = new Image();
+let cannonImageLoaded = false;
+cannonImage.src = 'assets/canon.png';
+cannonImage.onload = () => { cannonImageLoaded = true; };
+cannonImage.onerror = () => { cannonImageLoaded = false; };
+
 // ============================================
 // AUDIO SYSTEEM
 // ============================================
@@ -461,10 +468,10 @@ function generateWorld() {
             const targetX = spacing * (i + 1);
 
             // Zoek het dichtstbijzijnde vloersegment
-            const floor = floorPlatforms.find(p => targetX >= p.x && targetX <= p.x + p.width - 60);
+            const floor = floorPlatforms.find(p => targetX >= p.x && targetX <= p.x + p.width - 90);
             if (floor) {
-                const cannonWidth = 60;
-                const cannonHeight = 40;
+                const cannonWidth = 90;
+                const cannonHeight = 55;
                 cannons.push({
                     x: targetX,
                     y: floor.y - cannonHeight,
@@ -901,20 +908,22 @@ function update() {
         if (cannon.fireTimer <= 0) {
             cannon.fireTimer = cannon.fireRate;
             cannonballs.push({
-                x: cannon.x + (cannon.direction > 0 ? cannon.width : -10),
-                y: cannon.y + cannon.height / 2 - 6,
+                x: cannon.x + (cannon.direction > 0 ? cannon.width - 5 : -10),
+                y: cannon.y + 5,
                 width: 12,
                 height: 12,
-                velocityX: cannon.direction * 3
+                velocityX: cannon.direction * 3,
+                velocityY: -1.5
             });
         }
     });
 
     cannonballs = cannonballs.filter(ball => {
         ball.x += ball.velocityX;
+        ball.y += ball.velocityY;
 
         // Verwijder als buiten wereld
-        if (ball.x < -50 || ball.x > worldWidth + 50) return false;
+        if (ball.x < -50 || ball.x > worldWidth + 50 || ball.y < -100) return false;
 
         // Collision met speler
         if (checkCollision(player, ball)) {
@@ -1409,87 +1418,30 @@ function drawCannon(cannon) {
 
     ctx.save();
 
-    const cy = cannon.y * scale;
     const cw = cannon.width * scale;
     const ch = cannon.height * scale;
+    const cy = cannon.y * scale;
 
-    // Wielen
-    const wheelR = 10 * scale;
-    ctx.fillStyle = '#5D3A1A';
-    doodleCircle(screenX + 12 * scale, cy + ch + 2 * scale, wheelR);
-    ctx.fill();
-    ctx.strokeStyle = '#222222';
-    ctx.lineWidth = 3 * scale;
-    ctx.stroke();
-
-    doodleCircle(screenX + cw - 12 * scale, cy + ch + 2 * scale, wheelR);
-    ctx.fill();
-    ctx.strokeStyle = '#222222';
-    ctx.lineWidth = 3 * scale;
-    ctx.stroke();
-
-    // Wielspaken
-    ctx.strokeStyle = '#3E2310';
-    ctx.lineWidth = 2 * scale;
-    for (let i = 0; i < 4; i++) {
-        const angle = (i / 4) * Math.PI * 2;
-        const wx1 = screenX + 12 * scale;
-        const wy1 = cy + ch + 2 * scale;
-        ctx.beginPath();
-        ctx.moveTo(wx1, wy1);
-        ctx.lineTo(wx1 + Math.cos(angle) * wheelR * 0.8, wy1 + Math.sin(angle) * wheelR * 0.8);
-        ctx.stroke();
-
-        const wx2 = screenX + cw - 12 * scale;
-        ctx.beginPath();
-        ctx.moveTo(wx2, wy1);
-        ctx.lineTo(wx2 + Math.cos(angle) * wheelR * 0.8, wy1 + Math.sin(angle) * wheelR * 0.8);
-        ctx.stroke();
-    }
-
-    // Kanonlichaam (doodle rechthoek)
-    ctx.fillStyle = '#444444';
-    doodleRect(screenX + 5 * scale, cy + 5 * scale, cw - 10 * scale, ch - 8 * scale, 3);
-    ctx.fill();
-    ctx.strokeStyle = '#222222';
-    ctx.lineWidth = 4 * scale;
-    ctx.stroke();
-
-    // Kanonloop (uitstekend in schietrichting)
-    const barrelLength = 25 * scale;
-    const barrelH = 14 * scale;
-    const barrelY = cy + ch / 2 - barrelH / 2;
-    let barrelX;
-    if (cannon.direction > 0) {
-        barrelX = screenX + cw - 8 * scale;
+    if (cannonImageLoaded) {
+        // Sprite tekenen: afbeelding wijst naar links-omhoog
+        if (cannon.direction < 0) {
+            // Richting links: sprite ongewijzigd tekenen
+            ctx.drawImage(cannonImage, screenX, cy, cw, ch);
+        } else {
+            // Richting rechts: horizontaal spiegelen
+            ctx.translate(screenX + cw, cy);
+            ctx.scale(-1, 1);
+            ctx.drawImage(cannonImage, 0, 0, cw, ch);
+        }
     } else {
-        barrelX = screenX + 8 * scale - barrelLength;
+        // Fallback: eenvoudig kanon als sprite niet geladen is
+        ctx.fillStyle = '#444444';
+        doodleRect(screenX, cy, cw, ch, 3);
+        ctx.fill();
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 4 * scale;
+        ctx.stroke();
     }
-    ctx.fillStyle = '#333333';
-    doodleRect(barrelX, barrelY, barrelLength, barrelH, 2);
-    ctx.fill();
-    ctx.strokeStyle = '#222222';
-    ctx.lineWidth = 3 * scale;
-    ctx.stroke();
-
-    // Lont/opening markering
-    const openingX = cannon.direction > 0 ? barrelX + barrelLength : barrelX;
-    ctx.fillStyle = '#111111';
-    ctx.beginPath();
-    ctx.arc(openingX, barrelY + barrelH / 2, 4 * scale, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Decoratieve ring op het kanon
-    ctx.strokeStyle = '#8B7355';
-    ctx.lineWidth = 3 * scale;
-    ctx.beginPath();
-    ctx.moveTo(screenX + cw * 0.35, cy + 5 * scale);
-    ctx.lineTo(screenX + cw * 0.35, cy + ch - 3 * scale);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(screenX + cw * 0.65, cy + 5 * scale);
-    ctx.lineTo(screenX + cw * 0.65, cy + ch - 3 * scale);
-    ctx.stroke();
 
     ctx.restore();
 }
