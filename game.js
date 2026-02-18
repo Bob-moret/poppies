@@ -378,6 +378,9 @@ const player = {
     // Salto
     rotation: 0,
     doingSalto: false,
+    // Spin (lengteas)
+    doingSpin: false,
+    spinAngle: 0,
     // Walk animatie
     walkFrame: 0,
     walkTimer: 0,
@@ -834,10 +837,14 @@ function update() {
         player.jumpCut = false;
         playJumpSound();
 
-        // 25% kans op salto!
-        if (Math.random() < 0.25) {
+        // 25% salto, 10% spin
+        const trickRoll = Math.random();
+        if (trickRoll < 0.25) {
             player.doingSalto = true;
             player.rotation = 0;
+        } else if (trickRoll < 0.35) {
+            player.doingSpin = true;
+            player.spinAngle = 0;
         }
     }
 
@@ -860,10 +867,21 @@ function update() {
         }
     }
 
+    // Update spin (lengteas)
+    if (player.doingSpin && !player.grounded) {
+        player.spinAngle += 0.2;
+        if (player.spinAngle >= Math.PI * 2) {
+            player.spinAngle = 0;
+            player.doingSpin = false;
+        }
+    }
+
     // Reset rotatie bij landen
     if (player.grounded) {
         player.rotation = 0;
         player.doingSalto = false;
+        player.spinAngle = 0;
+        player.doingSpin = false;
     }
 
     // Walk animatie update
@@ -1404,6 +1422,11 @@ function drawPlayer() {
         // Salto rotatie
         if (player.doingSalto) {
             ctx.rotate(player.rotation);
+        }
+
+        // Spin om lengteas (3D-effect via horizontale schaling)
+        if (player.doingSpin) {
+            ctx.scale(Math.cos(player.spinAngle), 1);
         }
 
         // Kies de juiste afbeelding
