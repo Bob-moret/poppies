@@ -18,11 +18,17 @@ const BASE_HEIGHT = 700;
 let cameraX = 0;
 
 // Canvas grootte
+function isTouchDevice() {
+    return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+}
+
 function resizeCanvas() {
     const isFullscreen = document.fullscreenElement === gameContainer;
-    if (isFullscreen) {
-        const maxWidth = window.innerWidth * 0.95;
-        const maxHeight = window.innerHeight * 0.85;
+    const isMobileLandscape = isTouchDevice() && window.innerWidth > window.innerHeight;
+
+    if (isFullscreen || isMobileLandscape) {
+        const maxWidth = window.innerWidth * (isMobileLandscape ? 1.0 : 0.95);
+        const maxHeight = window.innerHeight * (isMobileLandscape ? 1.0 : 0.85);
         const ratio = Math.min(maxWidth / BASE_WIDTH, maxHeight / BASE_HEIGHT);
         canvas.width = BASE_WIDTH * ratio;
         canvas.height = BASE_HEIGHT * ratio;
@@ -498,7 +504,7 @@ function generateWorld() {
             x: platformX,
             y: py,
             width: pw,
-            height: 25,
+            height: 40,
             type: 'platform',
             breakable: breakable,
             broken: false
@@ -520,7 +526,7 @@ function generateWorld() {
                     x: extraX,
                     y: extraY,
                     width: 100 + Math.random() * 80,
-                    height: 25,
+                    height: 40,
                     type: 'platform',
                     breakable: Math.random() < 0.4,
                     broken: false
@@ -751,6 +757,9 @@ document.addEventListener('fullscreenchange', () => {
 });
 
 window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', () => {
+    setTimeout(resizeCanvas, 100);
+});
 
 restartBtn.addEventListener('click', () => {
     if (waitingForName) return;
