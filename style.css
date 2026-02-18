@@ -389,6 +389,42 @@ h1::after {
     transform: scale(0.9);
 }
 
+/* Portrait rotate overlay - standaard verborgen */
+.rotate-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(45, 24, 16, 0.95);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+}
+
+.rotate-message {
+    text-align: center;
+    color: #faf0dc;
+    font-family: 'Patrick Hand', 'Comic Sans MS', cursive;
+}
+
+.rotate-icon {
+    font-size: 4em;
+    margin-bottom: 20px;
+    animation: rotateHint 2s ease-in-out infinite;
+}
+
+@keyframes rotateHint {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(90deg); }
+}
+
+.rotate-message p {
+    font-size: 1.5em;
+    letter-spacing: 1px;
+}
+
 /* Toon touch controls op touch devices */
 @media (pointer: coarse), (hover: none) {
     .touch-zone {
@@ -396,5 +432,132 @@ h1::after {
     }
     .controls-info {
         display: none;
+    }
+}
+
+/* Portrait overlay op touch devices in portrait modus */
+@media (pointer: coarse) and (orientation: portrait) {
+    .rotate-overlay {
+        display: flex;
+    }
+}
+
+/* Mobiele landscape mode - volledig scherm game-ervaring */
+@media (pointer: coarse) and (orientation: landscape) {
+    body {
+        background: #000;
+        background-image: none;
+        overflow: hidden;
+        padding: 0;
+        margin: 0;
+    }
+
+    .game-container {
+        max-width: none;
+        padding: 0;
+        width: 100vw;
+        height: 100vh;
+        justify-content: center;
+    }
+
+    .game-title,
+    .controls-info,
+    .fullscreen-btn {
+        display: none !important;
+    }
+
+    .game-header {
+        position: fixed;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 500;
+        padding: 4px 16px;
+        margin: 0;
+        background: transparent;
+        padding-top: env(safe-area-inset-top, 4px);
+    }
+
+    .score-display span {
+        font-size: 0.9em;
+        padding: 4px 12px;
+        border-width: 2px;
+        background: rgba(250, 240, 220, 0.8);
+        box-shadow: 1px 1px 0 rgba(45, 24, 16, 0.3);
+    }
+
+    #levelDisplay {
+        background: rgba(45, 24, 16, 0.8) !important;
+    }
+
+    #gameCanvas {
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none;
+    }
+
+    /* Touch controls groter en beter gepositioneerd */
+    .touch-zone {
+        bottom: 20px;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    .touch-zone-left {
+        left: 16px;
+        padding-left: env(safe-area-inset-left, 0px);
+    }
+
+    .touch-zone-right {
+        right: 16px;
+        padding-right: env(safe-area-inset-right, 0px);
+    }
+
+    .touch-btn {
+        width: 80px;
+        height: 80px;
+        font-size: 2em;
+        background: rgba(250, 240, 220, 0.45);
+        border-color: rgba(45, 24, 16, 0.4);
+        box-shadow: 1px 1px 0 rgba(45, 24, 16, 0.2);
+    }
+
+    .touch-btn:active,
+    .touch-btn.active {
+        background: rgba(45, 24, 16, 0.7);
+        color: #faf0dc;
+        transform: scale(0.92);
+        box-shadow: none;
+    }
+
+    .touch-btn-jump {
+        width: 90px;
+        height: 90px;
+        font-size: 2.4em;
+        background: rgba(45, 24, 16, 0.4);
+    }
+
+    .touch-btn-jump:active,
+    .touch-btn-jump.active {
+        background: rgba(45, 24, 16, 0.8);
+        transform: scale(0.92);
+    }
+
+    /* Restart button positioneren als overlay */
+    .restart-btn {
+        position: fixed;
+        bottom: 50%;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 600;
+        margin: 0;
+    }
+
+    /* Naam invoer overlay aanpassen voor mobiel landscape */
+    .name-input-overlay {
+        position: fixed;
+        z-index: 700;
     }
 }
