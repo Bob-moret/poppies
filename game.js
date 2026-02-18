@@ -44,7 +44,38 @@ function resizeCanvas() {
     canvas.style.height = cssHeight + 'px';
     canvas.width = Math.round(cssWidth * dpr);
     canvas.height = Math.round(cssHeight * dpr);
+
+    // Positioneer touch controls buiten het canvas als er ruimte is
+    if (isTouchDevice() && isMobileLandscape) {
+        requestAnimationFrame(positionTouchZones);
+    }
 }
+
+function positionTouchZones() {
+    const rect = canvas.getBoundingClientRect();
+    const leftMargin = rect.left;
+    const rightMargin = window.innerWidth - rect.right;
+    const leftZone = document.getElementById('touchZoneLeft');
+    const rightZone = document.getElementById('touchZoneRight');
+
+    if (leftMargin > 40) {
+        // Knoppen naast het canvas stapelen en centreren in de marge
+        leftZone.style.flexDirection = 'column';
+        leftZone.style.left = Math.max(4, Math.round((leftMargin - leftZone.offsetWidth) / 2)) + 'px';
+        leftZone.style.right = '';
+    } else {
+        leftZone.style.flexDirection = 'row';
+        leftZone.style.left = '6px';
+        leftZone.style.right = '';
+    }
+
+    if (rightMargin > 40) {
+        rightZone.style.right = Math.max(4, Math.round((rightMargin - rightZone.offsetWidth) / 2)) + 'px';
+        rightZone.style.left = '';
+    } else {
+        rightZone.style.right = '6px';
+        rightZone.style.left = '';
+    }
 
 // ============================================
 // AFBEELDINGEN
