@@ -1975,7 +1975,7 @@ function drawStartScreen() {
     ctx.fillStyle = '#8B4513';
     ctx.font = `italic ${20 * scale}px Patrick Hand, Comic Sans MS`;
     ctx.textAlign = 'center';
-    ctx.fillText('Door Dex', 0, 0);
+    ctx.fillText('Ontworpen door Dex en Stan', 0, 0);
     ctx.restore();
 
     // Knipperend "druk spatie" met doodle box eromheen
