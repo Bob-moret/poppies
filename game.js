@@ -25,7 +25,9 @@ function isTouchDevice() {
 function resizeCanvas() {
     const isFullscreen = !!document.fullscreenElement;
     const isMobileLandscape = isTouchDevice() && window.innerWidth > window.innerHeight;
-    const dpr = window.devicePixelRatio || 1;
+    // Beperk DPR op mobiel om GPU niet te overbelasten (voorkomt framedrops)
+    const rawDpr = window.devicePixelRatio || 1;
+    const dpr = isTouchDevice() ? Math.min(rawDpr, 2) : rawDpr;
 
     let cssWidth, cssHeight;
     if (isFullscreen || isMobileLandscape) {
@@ -78,6 +80,7 @@ function positionTouchZones() {
         rightZone.style.right = '6px';
         rightZone.style.left = '';
     }
+}
 
 // ============================================
 // AFBEELDINGEN
