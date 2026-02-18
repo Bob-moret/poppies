@@ -228,6 +228,103 @@ h1::after {
     display: none;
 }
 
+/* Naam invoer overlay voor scorebord */
+.name-input-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    pointer-events: auto;
+}
+
+.name-input-box {
+    background: #faf0dc;
+    border: 4px solid #2d1810;
+    border-radius: 8px;
+    box-shadow: 4px 4px 0 #2d1810;
+    padding: 24px 32px;
+    text-align: center;
+    transform: rotate(-0.8deg);
+    min-width: 280px;
+}
+
+.name-input-title {
+    font-family: 'Patrick Hand', 'Comic Sans MS', cursive;
+    font-size: 2em;
+    color: #2d1810;
+    margin-bottom: 6px;
+    text-shadow: 2px 2px 0 rgba(139, 69, 19, 0.15);
+}
+
+.name-input-label {
+    font-family: 'Patrick Hand', 'Comic Sans MS', cursive;
+    font-size: 1.1em;
+    color: #8B4513;
+    margin-bottom: 14px;
+    font-style: italic;
+}
+
+.name-input-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+}
+
+.name-input-field {
+    font-family: 'Patrick Hand', 'Comic Sans MS', cursive;
+    font-size: 1.3em;
+    padding: 8px 14px;
+    border: 3px solid #2d1810;
+    border-radius: 4px;
+    background: #fff8dc;
+    color: #2d1810;
+    outline: none;
+    width: 160px;
+    box-shadow: 2px 2px 0 rgba(45, 24, 16, 0.2);
+    transform: rotate(0.5deg);
+}
+
+.name-input-field:focus {
+    border-color: #8B4513;
+    box-shadow: 2px 2px 0 #8B4513;
+}
+
+.name-input-field::placeholder {
+    color: #c4a882;
+    font-style: italic;
+}
+
+.name-submit-btn {
+    font-family: 'Patrick Hand', 'Comic Sans MS', cursive;
+    font-size: 1.3em;
+    font-weight: bold;
+    padding: 8px 20px;
+    background: #2d1810;
+    color: #faf0dc;
+    border: 3px solid #2d1810;
+    border-radius: 4px;
+    cursor: pointer;
+    box-shadow: 2px 2px 0 #8B4513;
+    transition: all 0.1s ease;
+    white-space: nowrap;
+}
+
+.name-submit-btn:hover {
+    transform: translateY(2px);
+    box-shadow: 1px 1px 0 #8B4513;
+}
+
+.name-submit-btn:active {
+    transform: translateY(3px);
+    box-shadow: none;
+}
+
 /* Touch controls - overlay aan zijkanten van het scherm */
 .touch-zone {
     display: none;

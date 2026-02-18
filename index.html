@@ -10,7 +10,7 @@
     <div class="game-container" id="gameContainer">
         <div class="game-title">
             <h1>De Gekke Poppies</h1>
-            <span class="payoff">Door Dex</span>
+            <span class="payoff">Ontworpen door Dex en Stan</span>
         </div>
         <div class="game-header">
             <div class="score-display">
@@ -24,6 +24,17 @@
         </div>
         <button id="restartBtn" class="restart-btn" style="display: none;">Opnieuw Spelen</button>
         <button id="fullscreenBtn" class="fullscreen-btn">Volledig Scherm</button>
+        <!-- Naam invoer overlay voor scorebord -->
+        <div id="nameInputOverlay" class="name-input-overlay" style="display: none;">
+            <div class="name-input-box">
+                <h2 class="name-input-title">Scorebord</h2>
+                <p class="name-input-label">Vul je naam in, piraat!</p>
+                <div class="name-input-row">
+                    <input type="text" id="playerNameInput" class="name-input-field" maxlength="12" placeholder="Naam..." autocomplete="off" />
+                    <button id="nameSubmitBtn" class="name-submit-btn">OK</button>
+                </div>
+            </div>
+        </div>
     </div>
     <!-- Touch controls buiten game-container voor betrouwbare fixed positioning op iPad -->
     <div class="touch-zone touch-zone-left" id="touchZoneLeft">
