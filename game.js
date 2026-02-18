@@ -1995,6 +1995,7 @@ function drawStartScreen() {
 
         ctx.fillStyle = '#222222';
         ctx.font = `bold ${20 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('>>> DRUK SPATIE <<<', canvas.width/2, btnY + btnH / 2);
         ctx.textBaseline = 'alphabetic';
