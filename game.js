@@ -72,12 +72,11 @@ function positionTouchZones() {
     leftZone.style.right = '';
 
     if (rightMargin > 40) {
-        rightZone.style.right = Math.max(4, Math.round((rightMargin - rightZone.offsetWidth) / 2)) + 'px';
-        rightZone.style.left = '';
+        rightZone.style.right = Math.max(4, Math.round(rightMargin - rightZone.offsetWidth - 4)) + 'px';
     } else {
         rightZone.style.right = '6px';
-        rightZone.style.left = '';
     }
+    rightZone.style.left = '';
 }
 
 // ============================================
@@ -397,7 +396,6 @@ function submitName() {
     addToLeaderboard(name, score);
     hideNameInput();
     showingLeaderboard = true;
-    restartBtn.style.display = 'inline-block';
 }
 
 // Event listeners voor naam invoer
