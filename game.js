@@ -87,6 +87,31 @@ cannonImage.src = 'assets/canon.png';
 cannonImage.onload = () => { cannonImageLoaded = true; };
 cannonImage.onerror = () => { cannonImageLoaded = false; };
 
+// Achtergrond sprites
+const bgImage = new Image();
+let bgImageLoaded = false;
+bgImage.src = 'assets/achtergrond.png';
+bgImage.onload = () => { bgImageLoaded = true; };
+bgImage.onerror = () => { bgImageLoaded = false; };
+
+const cloudsImage = new Image();
+let cloudsImageLoaded = false;
+cloudsImage.src = 'assets/wolken.png';
+cloudsImage.onload = () => { cloudsImageLoaded = true; };
+cloudsImage.onerror = () => { cloudsImageLoaded = false; };
+
+const sunImage = new Image();
+let sunImageLoaded = false;
+sunImage.src = 'assets/zon.png';
+sunImage.onload = () => { sunImageLoaded = true; };
+sunImage.onerror = () => { sunImageLoaded = false; };
+
+const groundImage = new Image();
+let groundImageLoaded = false;
+groundImage.src = 'assets/grond.png';
+groundImage.onload = () => { groundImageLoaded = true; };
+groundImage.onerror = () => { groundImageLoaded = false; };
+
 // ============================================
 // AUDIO SYSTEEM
 // ============================================
@@ -243,6 +268,86 @@ let currentLevel = 1;
 let levelComplete = false;
 let gameWon = false;
 let flag = null;
+let waitingForName = false; // Wacht op naam invoer voor scorebord
+let showingLeaderboard = false; // Scorebord tonen na naam invoer
+
+// Scorebord laden uit localStorage
+function loadLeaderboard() {
+    try {
+        const data = localStorage.getItem('poppiesLeaderboard');
+        return data ? JSON.parse(data) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+// Scorebord opslaan in localStorage (max 10 entries, gesorteerd op score)
+function saveLeaderboard(leaderboard) {
+    leaderboard.sort((a, b) => b.score - a.score);
+    leaderboard = leaderboard.slice(0, 10);
+    localStorage.setItem('poppiesLeaderboard', JSON.stringify(leaderboard));
+    return leaderboard;
+}
+
+// Score toevoegen aan scorebord
+function addToLeaderboard(name, playerScore) {
+    const leaderboard = loadLeaderboard();
+    leaderboard.push({ name: name, score: playerScore });
+    return saveLeaderboard(leaderboard);
+}
+
+// Naam invoer elementen
+const nameInputOverlay = document.getElementById('nameInputOverlay');
+const playerNameInput = document.getElementById('playerNameInput');
+const nameSubmitBtn = document.getElementById('nameSubmitBtn');
+
+// Naam invoer tonen
+function showNameInput() {
+    waitingForName = true;
+    showingLeaderboard = false;
+    nameInputOverlay.style.display = 'flex';
+    playerNameInput.value = '';
+    playerNameInput.focus();
+}
+
+// Naam invoer verbergen
+function hideNameInput() {
+    waitingForName = false;
+    nameInputOverlay.style.display = 'none';
+}
+
+// Naam invoer bevestigen
+function submitName() {
+    let name = playerNameInput.value.trim();
+    if (!name) name = 'Piraat';
+    addToLeaderboard(name, score);
+    hideNameInput();
+    showingLeaderboard = true;
+    restartBtn.style.display = 'inline-block';
+}
+
+// Event listeners voor naam invoer
+nameSubmitBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    submitName();
+});
+
+playerNameInput.addEventListener('keydown', (e) => {
+    e.stopPropagation(); // Voorkom dat game controls reageren
+    if (e.code === 'Enter') {
+        e.preventDefault();
+        submitName();
+    }
+});
+
+// Voorkom dat spatie in invoerveld het spel herstart
+playerNameInput.addEventListener('keyup', (e) => {
+    e.stopPropagation();
+});
+
+playerNameInput.addEventListener('keypress', (e) => {
+    e.stopPropagation();
+});
 
 // Level configuratie - moeilijkheid neemt toe per level
 const levelConfig = {
@@ -497,6 +602,8 @@ document.addEventListener('keydown', (e) => {
     if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
         e.preventDefault();
         keys.jump = true;
+        if (waitingForName) return; // Wacht op naam invoer
+        if (showingLeaderboard) { showingLeaderboard = false; restartGame(); return; }
         if (!gameStarted) startGame();
         else if (levelComplete && !gameWon) nextLevel();
         else if (gameWon) restartGame();
@@ -548,6 +655,8 @@ handleTouchBtn(touchBtnRight,
 );
 handleTouchBtn(touchBtnJump,
     () => {
+        if (waitingForName) return;
+        if (showingLeaderboard) { showingLeaderboard = false; restartGame(); return; }
         if (!gameStarted) { startGame(); return; }
         if (levelComplete && !gameWon) { nextLevel(); return; }
         if (gameWon) { restartGame(); return; }
@@ -564,6 +673,8 @@ handleTouchBtn(touchBtnJump,
 // Canvas touch fallback (voor devices zonder zichtbare knoppen)
 canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
+    if (waitingForName) return;
+    if (showingLeaderboard) { showingLeaderboard = false; restartGame(); return; }
     if (!gameStarted) { startGame(); return; }
     if (levelComplete && !gameWon) { nextLevel(); return; }
     if (gameWon) { restartGame(); return; }
@@ -612,6 +723,11 @@ document.addEventListener('fullscreenchange', () => {
 
 window.addEventListener('resize', resizeCanvas);
 
+restartBtn.addEventListener('click', () => {
+    if (waitingForName) return;
+    restartGame();
+});
+
 // ============================================
 // GAME FUNCTIES
 // ============================================
@@ -624,6 +740,9 @@ function startGame() {
     currentLevel = 1;
     levelComplete = false;
     gameWon = false;
+    waitingForName = false;
+    showingLeaderboard = false;
+    hideNameInput();
     cameraX = 0;
 
     player.x = 100;
@@ -671,12 +790,15 @@ function nextLevel() {
 
 function gameOver() {
     gameRunning = false;
+    showingLeaderboard = false;
     playGameOverSound();
     if (score > highScore) {
         highScore = score;
         localStorage.setItem('poppiesHighScore', highScore);
     }
-    restartBtn.style.display = 'inline-block';
+    // Toon naam invoer voor scorebord (verberg herstart knop tot na invoer)
+    restartBtn.style.display = 'none';
+    showNameInput();
 }
 
 function getScale() {
@@ -1014,98 +1136,126 @@ function drawBackground() {
     const scale = getScale();
     const time = Date.now() / 1000;
 
-    // Zonnige lucht - effen cartoony kleur
-    ctx.fillStyle = '#87CEEB';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Laag 1 — achtergrond.png (langzaamste parallax ~5%)
+    if (bgImageLoaded) {
+        const bgScale = canvas.height / bgImage.height;
+        const bgW = bgImage.width * bgScale;
+        const offsetX = -(cameraX * 0.05 * scale) % bgW;
+        // Tegel de achtergrond zodat er geen gaten ontstaan
+        for (let x = offsetX; x < canvas.width; x += bgW) {
+            ctx.drawImage(bgImage, x, 0, bgW, canvas.height);
+        }
+        if (offsetX > 0) {
+            ctx.drawImage(bgImage, offsetX - bgW, 0, bgW, canvas.height);
+        }
+    } else {
+        // Fallback: effen blauwe lucht + zee
+        ctx.fillStyle = '#87CEEB';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Cartoony wolken (parallax)
-    for (let i = 0; i < 5; i++) {
-        const baseX = (i * 350) % (BASE_WIDTH * 2);
-        const cloudX = ((baseX - cameraX * 0.15) % (BASE_WIDTH * 1.8) + BASE_WIDTH * 1.8) % (BASE_WIDTH * 1.8) * scale;
-        const cy = (60 + (i * 47) % 100) * scale;
-        const cloudSize = (40 + (i * 13) % 30) * scale;
+        const seaY = canvas.height * 0.65;
+        ctx.fillStyle = '#4FC3F7';
+        ctx.fillRect(0, seaY, canvas.width, canvas.height - seaY);
 
-        // Wolk vulling
-        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 4 * scale;
         ctx.beginPath();
-        ctx.arc(cloudX, cy, cloudSize, 0, Math.PI * 2);
-        ctx.arc(cloudX - cloudSize * 0.7, cy + cloudSize * 0.2, cloudSize * 0.6, 0, Math.PI * 2);
-        ctx.arc(cloudX + cloudSize * 0.7, cy + cloudSize * 0.1, cloudSize * 0.7, 0, Math.PI * 2);
-        ctx.arc(cloudX - cloudSize * 0.3, cy - cloudSize * 0.3, cloudSize * 0.5, 0, Math.PI * 2);
-        ctx.arc(cloudX + cloudSize * 0.4, cy - cloudSize * 0.25, cloudSize * 0.55, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo(0, seaY);
+        ctx.lineTo(canvas.width, seaY);
+        ctx.stroke();
 
-        // Dikke zwarte outline
+        // Golven
         ctx.strokeStyle = '#222222';
         ctx.lineWidth = 3 * scale;
-        ctx.stroke();
-    }
-
-    // Cartoony zon (parallax)
-    const sunX = (200 - cameraX * 0.03) * scale;
-    const sunY = 90 * scale;
-    const sunR = 50 * scale;
-
-    // Zonnestralen
-    ctx.strokeStyle = '#FFD700';
-    ctx.lineWidth = 4 * scale;
-    for (let i = 0; i < 12; i++) {
-        const angle = (i / 12) * Math.PI * 2 + time * 0.5;
-        const innerR = sunR + 10 * scale;
-        const outerR = sunR + 30 * scale + Math.sin(time * 3 + i) * 5 * scale;
-        ctx.beginPath();
-        ctx.moveTo(sunX + Math.cos(angle) * innerR, sunY + Math.sin(angle) * innerR);
-        ctx.lineTo(sunX + Math.cos(angle) * outerR, sunY + Math.sin(angle) * outerR);
-        ctx.stroke();
-    }
-
-    // Zon
-    ctx.fillStyle = '#FFDD00';
-    doodleCircle(sunX, sunY, sunR);
-    ctx.fill();
-    ctx.strokeStyle = '#222222';
-    ctx.lineWidth = 4 * scale;
-    ctx.stroke();
-
-    // Zon gezichtje
-    ctx.fillStyle = '#222222';
-    ctx.beginPath();
-    ctx.arc(sunX - 15 * scale, sunY - 5 * scale, 5 * scale, 0, Math.PI * 2);
-    ctx.arc(sunX + 15 * scale, sunY - 5 * scale, 5 * scale, 0, Math.PI * 2);
-    ctx.fill();
-    // Glimlach
-    ctx.strokeStyle = '#222222';
-    ctx.lineWidth = 3 * scale;
-    ctx.beginPath();
-    ctx.arc(sunX, sunY + 5 * scale, 20 * scale, 0.2, Math.PI - 0.2);
-    ctx.stroke();
-
-    // Zee op achtergrond
-    const seaY = canvas.height * 0.65;
-    ctx.fillStyle = '#4FC3F7';
-    ctx.fillRect(0, seaY, canvas.width, canvas.height - seaY);
-
-    // Dikke lijn tussen lucht en zee
-    ctx.strokeStyle = '#222222';
-    ctx.lineWidth = 4 * scale;
-    ctx.beginPath();
-    ctx.moveTo(0, seaY);
-    ctx.lineTo(canvas.width, seaY);
-    ctx.stroke();
-
-    // Cartoony golven
-    ctx.strokeStyle = '#222222';
-    ctx.lineWidth = 3 * scale;
-    for (let row = 0; row < 3; row++) {
-        ctx.beginPath();
-        const yBase = seaY + 30 * scale + row * 40 * scale;
-        for (let x = 0; x < canvas.width + 50; x += 40 * scale) {
-            const waveOffset = cameraX * 0.2 + row * 100 + time * 50;
-            const xPos = x - (waveOffset * scale) % (40 * scale);
-            ctx.moveTo(xPos, yBase);
-            ctx.quadraticCurveTo(xPos + 20 * scale, yBase - 15 * scale, xPos + 40 * scale, yBase);
+        for (let row = 0; row < 3; row++) {
+            ctx.beginPath();
+            const yBase = seaY + 30 * scale + row * 40 * scale;
+            for (let x = 0; x < canvas.width + 50; x += 40 * scale) {
+                const waveOffset = cameraX * 0.2 + row * 100 + time * 50;
+                const xPos = x - (waveOffset * scale) % (40 * scale);
+                ctx.moveTo(xPos, yBase);
+                ctx.quadraticCurveTo(xPos + 20 * scale, yBase - 15 * scale, xPos + 40 * scale, yBase);
+            }
+            ctx.stroke();
         }
+    }
+
+    // Laag 2 — zon.png (parallax ~3%, nauwelijks bewegend)
+    if (sunImageLoaded) {
+        const sunH = 300 * scale;
+        const sunScale = sunH / sunImage.height;
+        const sunW = sunImage.width * sunScale;
+        const sunOffsetX = -(cameraX * 0.03 * scale);
+        ctx.drawImage(sunImage, sunOffsetX, 0, sunW, sunH);
+    } else {
+        // Fallback: procedurele zon met stralen en gezichtje
+        const sunX = (200 - cameraX * 0.03) * scale;
+        const sunY = 90 * scale;
+        const sunR = 50 * scale;
+
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 4 * scale;
+        for (let i = 0; i < 12; i++) {
+            const angle = (i / 12) * Math.PI * 2 + time * 0.5;
+            const innerR = sunR + 10 * scale;
+            const outerR = sunR + 30 * scale + Math.sin(time * 3 + i) * 5 * scale;
+            ctx.beginPath();
+            ctx.moveTo(sunX + Math.cos(angle) * innerR, sunY + Math.sin(angle) * innerR);
+            ctx.lineTo(sunX + Math.cos(angle) * outerR, sunY + Math.sin(angle) * outerR);
+            ctx.stroke();
+        }
+
+        ctx.fillStyle = '#FFDD00';
+        doodleCircle(sunX, sunY, sunR);
+        ctx.fill();
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 4 * scale;
         ctx.stroke();
+
+        ctx.fillStyle = '#222222';
+        ctx.beginPath();
+        ctx.arc(sunX - 15 * scale, sunY - 5 * scale, 5 * scale, 0, Math.PI * 2);
+        ctx.arc(sunX + 15 * scale, sunY - 5 * scale, 5 * scale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 3 * scale;
+        ctx.beginPath();
+        ctx.arc(sunX, sunY + 5 * scale, 20 * scale, 0.2, Math.PI - 0.2);
+        ctx.stroke();
+    }
+
+    // Laag 3 — wolken.png (parallax ~15%)
+    if (cloudsImageLoaded) {
+        const cloudScale = canvas.height / cloudsImage.height;
+        const cloudW = cloudsImage.width * cloudScale;
+        const cloudOffsetX = -(cameraX * 0.15 * scale) % cloudW;
+        for (let x = cloudOffsetX; x < canvas.width; x += cloudW) {
+            ctx.drawImage(cloudsImage, x, 0, cloudW, canvas.height);
+        }
+        if (cloudOffsetX > 0) {
+            ctx.drawImage(cloudsImage, cloudOffsetX - cloudW, 0, cloudW, canvas.height);
+        }
+    } else {
+        // Fallback: procedurele wolken
+        for (let i = 0; i < 5; i++) {
+            const baseX = (i * 350) % (BASE_WIDTH * 2);
+            const cloudX = ((baseX - cameraX * 0.15) % (BASE_WIDTH * 1.8) + BASE_WIDTH * 1.8) % (BASE_WIDTH * 1.8) * scale;
+            const cy = (60 + (i * 47) % 100) * scale;
+            const cloudSize = (40 + (i * 13) % 30) * scale;
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(cloudX, cy, cloudSize, 0, Math.PI * 2);
+            ctx.arc(cloudX - cloudSize * 0.7, cy + cloudSize * 0.2, cloudSize * 0.6, 0, Math.PI * 2);
+            ctx.arc(cloudX + cloudSize * 0.7, cy + cloudSize * 0.1, cloudSize * 0.7, 0, Math.PI * 2);
+            ctx.arc(cloudX - cloudSize * 0.3, cy - cloudSize * 0.3, cloudSize * 0.5, 0, Math.PI * 2);
+            ctx.arc(cloudX + cloudSize * 0.4, cy - cloudSize * 0.25, cloudSize * 0.55, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = '#222222';
+            ctx.lineWidth = 3 * scale;
+            ctx.stroke();
+        }
     }
 }
 
@@ -1123,33 +1273,58 @@ function drawPlatform(platform) {
     ctx.save();
 
     if (platform.type === 'floor') {
-        // Cartoony vloer/dek van de boot
-        ctx.fillStyle = '#DEB887';
-        doodleRect(screenX, py, pw, ph, 2);
-        ctx.fill();
+        if (groundImageLoaded) {
+            // Grond.png als textuur: onderste deel van het beeld als planken
+            const srcH = 50; // Onderste 50px van de 268px afbeelding
+            const srcY = groundImage.height - srcH;
+            const srcImgW = groundImage.width; // 1920px
 
-        // Dikke zwarte outline
-        ctx.strokeStyle = '#222222';
-        ctx.lineWidth = 4 * scale;
-        ctx.stroke();
-
-        // Horizontale houten planken - doodle stijl (stabiel)
-        ctx.strokeStyle = '#8B4513';
-        ctx.lineWidth = 2 * scale;
-        for (let i = 20 * scale; i < ph; i += 25 * scale) {
-            const plankSeed = Math.floor(platform.x + i);
+            // Clip naar platform grenzen
+            ctx.save();
             ctx.beginPath();
-            ctx.moveTo(screenX + 5, py + i + (seededRandom(plankSeed) - 0.5) * 2);
-            ctx.lineTo(screenX + pw - 5, py + i + (seededRandom(plankSeed + 1) - 0.5) * 2);
-            ctx.stroke();
-        }
+            ctx.rect(screenX, py, pw, ph);
+            ctx.clip();
 
-        // Spijkers/stipjes voor extra detail
-        ctx.fillStyle = '#222222';
-        for (let i = 30 * scale; i < pw; i += 80 * scale) {
-            ctx.beginPath();
-            ctx.arc(screenX + i, py + 10 * scale, 3 * scale, 0, Math.PI * 2);
+            // Tegel horizontaal, source-X gebaseerd op wereld-positie voor naadloze tiling
+            const tileW = srcImgW * scale * (ph / (srcH * scale)); // Behoud aspect ratio
+            const worldOffsetX = (platform.x % srcImgW) * scale;
+            const startX = screenX - worldOffsetX;
+
+            for (let x = startX; x < screenX + pw; x += tileW) {
+                ctx.drawImage(groundImage, 0, srcY, srcImgW, srcH, x, py, tileW, ph);
+            }
+            // Tegel ook links als nodig
+            if (startX > screenX) {
+                ctx.drawImage(groundImage, 0, srcY, srcImgW, srcH, startX - tileW, py, tileW, ph);
+            }
+
+            ctx.restore();
+        } else {
+            // Fallback: cartoony vloer/dek van de boot
+            ctx.fillStyle = '#DEB887';
+            doodleRect(screenX, py, pw, ph, 2);
             ctx.fill();
+
+            ctx.strokeStyle = '#222222';
+            ctx.lineWidth = 4 * scale;
+            ctx.stroke();
+
+            ctx.strokeStyle = '#8B4513';
+            ctx.lineWidth = 2 * scale;
+            for (let i = 20 * scale; i < ph; i += 25 * scale) {
+                const plankSeed = Math.floor(platform.x + i);
+                ctx.beginPath();
+                ctx.moveTo(screenX + 5, py + i + (seededRandom(plankSeed) - 0.5) * 2);
+                ctx.lineTo(screenX + pw - 5, py + i + (seededRandom(plankSeed + 1) - 0.5) * 2);
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = '#222222';
+            for (let i = 30 * scale; i < pw; i += 80 * scale) {
+                ctx.beginPath();
+                ctx.arc(screenX + i, py + 10 * scale, 3 * scale, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
     } else {
         // Cartoony zwevend platform
@@ -1718,17 +1893,54 @@ function drawGameWon() {
     ctx.fillText('⭐', boxX + boxW - 40 * scale, boxY + boxH - 20 * scale);
 }
 
+function drawLeaderboardEntries(startY, maxEntries, scale) {
+    const leaderboard = loadLeaderboard();
+    const entries = leaderboard.slice(0, maxEntries);
+
+    if (entries.length === 0) {
+        ctx.fillStyle = '#999999';
+        ctx.font = `italic ${16 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.textAlign = 'center';
+        ctx.fillText('Nog geen scores...', canvas.width / 2, startY);
+        return;
+    }
+
+    const lineHeight = 24 * scale;
+
+    entries.forEach((entry, i) => {
+        const y = startY + i * lineHeight;
+        const rank = i + 1;
+
+        // Medaille kleuren voor top 3
+        if (rank === 1) ctx.fillStyle = '#FFD700';
+        else if (rank === 2) ctx.fillStyle = '#C0C0C0';
+        else if (rank === 3) ctx.fillStyle = '#CD7F32';
+        else ctx.fillStyle = '#222222';
+
+        ctx.font = `bold ${17 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.textAlign = 'center';
+
+        // Afkorten van naam als die te lang is
+        const displayName = entry.name.length > 12 ? entry.name.substring(0, 12) : entry.name;
+        const text = `${rank}. ${displayName} - ${entry.score}`;
+        ctx.fillText(text, canvas.width / 2, y);
+    });
+}
+
 function drawStartScreen() {
     const scale = getScale();
     const time = Date.now() / 1000;
+    const leaderboard = loadLeaderboard();
+    const hasScores = leaderboard.length > 0;
 
     // Semi-transparante achtergrond
     ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Grote doodle box voor titel
+    // Grote doodle box voor titel - groter als er scores zijn
     const boxW = 500 * scale;
-    const boxH = 350 * scale;
+    const extraH = hasScores ? Math.min(leaderboard.length, 5) * 24 + 50 : 0;
+    const boxH = (350 + extraH) * scale;
     const boxX = canvas.width/2 - boxW/2;
     const boxY = canvas.height/2 - boxH/2 - 20 * scale;
 
@@ -1739,9 +1951,12 @@ function drawStartScreen() {
     ctx.lineWidth = 5 * scale;
     ctx.stroke();
 
+    // Bereken verticale offset zodat inhoud gecentreerd is in de box
+    const contentBaseY = boxY + 80 * scale;
+
     // Wiebelige titel
     ctx.save();
-    ctx.translate(canvas.width/2, canvas.height/2 - 100 * scale);
+    ctx.translate(canvas.width/2, contentBaseY);
     ctx.rotate(Math.sin(time * 2) * 0.03);
 
     ctx.fillStyle = '#222222';
@@ -1755,7 +1970,7 @@ function drawStartScreen() {
 
     // Payoff
     ctx.save();
-    ctx.translate(canvas.width/2, canvas.height/2 - 45 * scale);
+    ctx.translate(canvas.width/2, contentBaseY + 55 * scale);
     ctx.rotate(1.5 * Math.PI / 180);
     ctx.fillStyle = '#8B4513';
     ctx.font = `italic ${20 * scale}px Patrick Hand, Comic Sans MS`;
@@ -1769,7 +1984,7 @@ function drawStartScreen() {
         const btnW = 320 * scale;
         const btnH = 45 * scale;
         const btnX = canvas.width/2 - btnW/2;
-        const btnY = canvas.height/2 + 10 * scale;
+        const btnY = contentBaseY + 105 * scale;
 
         ctx.fillStyle = '#90EE90';
         doodleRect(btnX, btnY, btnW, btnH, 4);
@@ -1788,10 +2003,34 @@ function drawStartScreen() {
     // Besturing info
     ctx.fillStyle = '#666666';
     ctx.font = `${16 * scale}px Patrick Hand, Comic Sans MS`;
-    ctx.fillText('← → = Lopen    SPATIE = Springen', canvas.width/2, canvas.height/2 + 90 * scale);
-    ctx.fillText('Spring op vijanden om ze te verslaan!', canvas.width/2, canvas.height/2 + 115 * scale);
+    ctx.textAlign = 'center';
+    ctx.fillText('← → = Lopen    SPATIE = Springen', canvas.width/2, contentBaseY + 185 * scale);
+    ctx.fillText('Spring op vijanden om ze te verslaan!', canvas.width/2, contentBaseY + 210 * scale);
+
+    // Scorebord op startscherm
+    if (hasScores) {
+        const lbStartY = contentBaseY + 250 * scale;
+
+        // Scorebord titel met doodle lijn
+        ctx.fillStyle = '#2d1810';
+        ctx.font = `bold ${20 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.textAlign = 'center';
+        ctx.fillText('Scorebord', canvas.width / 2, lbStartY);
+
+        // Doodle onderstreep lijn
+        const lineW = 100 * scale;
+        ctx.strokeStyle = '#8B4513';
+        ctx.lineWidth = 2 * scale;
+        ctx.beginPath();
+        ctx.moveTo(canvas.width / 2 - lineW / 2, lbStartY + 5 * scale);
+        ctx.lineTo(canvas.width / 2 + lineW / 2, lbStartY + 5 * scale);
+        ctx.stroke();
+
+        drawLeaderboardEntries(lbStartY + 28 * scale, 5, scale);
+    }
 
     // Kleine decoraties
+    ctx.textAlign = 'center';
     ctx.font = `${30 * scale}px Patrick Hand, Comic Sans MS`;
     ctx.fillText('⚓', boxX + 30 * scale, boxY + 40 * scale);
     ctx.fillText('💰', boxX + boxW - 40 * scale, boxY + 40 * scale);
@@ -1807,77 +2046,204 @@ function drawGameOver() {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Doodle box
-    const boxW = 450 * scale;
-    const boxH = 300 * scale;
-    const boxX = canvas.width/2 - boxW/2;
-    const boxY = canvas.height/2 - boxH/2;
+    if (showingLeaderboard) {
+        // Toon scorebord na naam invoer
+        const leaderboard = loadLeaderboard();
+        const entryCount = Math.min(leaderboard.length, 10);
+        const boxW = 450 * scale;
+        const boxH = (220 + entryCount * 24) * scale;
+        const boxX = canvas.width / 2 - boxW / 2;
+        const boxY = canvas.height / 2 - boxH / 2;
 
-    ctx.fillStyle = '#FFF8DC';
-    doodleRect(boxX, boxY, boxW, boxH, 8);
-    ctx.fill();
-    ctx.strokeStyle = '#222222';
-    ctx.lineWidth = 5 * scale;
-    ctx.stroke();
-
-    // Wiebelige Game Over titel
-    ctx.save();
-    ctx.translate(canvas.width/2, canvas.height/2 - 80 * scale);
-    ctx.rotate(Math.sin(time * 3) * 0.05);
-
-    ctx.fillStyle = '#222222';
-    ctx.font = `bold ${52 * scale}px Patrick Hand, Comic Sans MS`;
-    ctx.textAlign = 'center';
-    ctx.fillText('GAME OVER', 3 * scale, 3 * scale);
-    ctx.fillStyle = '#FF6B6B';
-    ctx.fillText('GAME OVER', 0, 0);
-    ctx.restore();
-
-    // Score in een sterretje
-    ctx.fillStyle = '#FFD700';
-    ctx.font = `${60 * scale}px Patrick Hand, Comic Sans MS`;
-    ctx.fillText('⭐', canvas.width/2, canvas.height/2 + 5 * scale);
-
-    ctx.fillStyle = '#222222';
-    ctx.font = `bold ${22 * scale}px Patrick Hand, Comic Sans MS`;
-    ctx.fillText(`${score}`, canvas.width/2, canvas.height/2 + 12 * scale);
-
-    if (score >= highScore && score > 0) {
-        ctx.fillStyle = '#FF6B6B';
-        ctx.font = `bold ${20 * scale}px Patrick Hand, Comic Sans MS`;
-        ctx.fillText('NIEUW RECORD!', canvas.width/2, canvas.height/2 + 55 * scale);
-    } else {
-        ctx.fillStyle = '#666666';
-        ctx.font = `${18 * scale}px Patrick Hand, Comic Sans MS`;
-        ctx.fillText(`Best: ${highScore}`, canvas.width/2, canvas.height/2 + 55 * scale);
-    }
-
-    // Retry knop
-    const blink = Math.sin(time * 4) > 0;
-    if (blink) {
-        const btnW = 280 * scale;
-        const btnH = 40 * scale;
-        const btnX = canvas.width/2 - btnW/2;
-        const btnY = canvas.height/2 + 80 * scale;
-
-        ctx.fillStyle = '#90EE90';
-        doodleRect(btnX, btnY, btnW, btnH, 4);
+        ctx.fillStyle = '#FFF8DC';
+        doodleRect(boxX, boxY, boxW, boxH, 8);
         ctx.fill();
         ctx.strokeStyle = '#222222';
-        ctx.lineWidth = 3 * scale;
+        ctx.lineWidth = 5 * scale;
         ctx.stroke();
 
-        ctx.fillStyle = '#222222';
-        ctx.font = `bold ${18 * scale}px Patrick Hand, Comic Sans MS`;
-        ctx.textBaseline = 'middle';
-        ctx.fillText('SPATIE = Opnieuw', canvas.width/2, btnY + btnH / 2);
-        ctx.textBaseline = 'alphabetic';
-    }
+        // Wiebelige titel
+        ctx.save();
+        ctx.translate(canvas.width / 2, boxY + 55 * scale);
+        ctx.rotate(Math.sin(time * 2) * 0.03);
 
-    // Verdrietige emoji's
-    ctx.font = `${25 * scale}px Patrick Hand, Comic Sans MS`;
-    ctx.fillText('😢', boxX + 35 * scale, boxY + 40 * scale);
-    ctx.fillText('💀', boxX + boxW - 45 * scale, boxY + 40 * scale);
+        ctx.fillStyle = '#222222';
+        ctx.font = `bold ${40 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.textAlign = 'center';
+        ctx.fillText('Scorebord', 3 * scale, 3 * scale);
+        ctx.fillStyle = '#8B4513';
+        ctx.fillText('Scorebord', 0, 0);
+        ctx.restore();
+
+        // Jouw score
+        ctx.fillStyle = '#222222';
+        ctx.font = `bold ${20 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`Jouw score: ${score}`, canvas.width / 2, boxY + 90 * scale);
+
+        // Doodle onderstreep lijn
+        const lineW = 160 * scale;
+        ctx.strokeStyle = '#8B4513';
+        ctx.lineWidth = 2 * scale;
+        ctx.beginPath();
+        ctx.moveTo(canvas.width / 2 - lineW / 2, boxY + 100 * scale);
+        ctx.lineTo(canvas.width / 2 + lineW / 2, boxY + 100 * scale);
+        ctx.stroke();
+
+        // Scorebord entries
+        drawLeaderboardEntries(boxY + 125 * scale, 10, scale);
+
+        // Retry knop
+        const blink = Math.sin(time * 4) > 0;
+        if (blink) {
+            const btnW = 280 * scale;
+            const btnH = 40 * scale;
+            const btnX = canvas.width / 2 - btnW / 2;
+            const btnY = boxY + boxH - 55 * scale;
+
+            ctx.fillStyle = '#90EE90';
+            doodleRect(btnX, btnY, btnW, btnH, 4);
+            ctx.fill();
+            ctx.strokeStyle = '#222222';
+            ctx.lineWidth = 3 * scale;
+            ctx.stroke();
+
+            ctx.fillStyle = '#222222';
+            ctx.font = `bold ${18 * scale}px Patrick Hand, Comic Sans MS`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('SPATIE = Opnieuw', canvas.width / 2, btnY + btnH / 2);
+            ctx.textBaseline = 'alphabetic';
+        }
+
+        // Decoraties
+        ctx.font = `${25 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.textAlign = 'center';
+        ctx.fillText('🏴‍☠️', boxX + 35 * scale, boxY + 40 * scale);
+        ctx.fillText('⭐', boxX + boxW - 45 * scale, boxY + 40 * scale);
+
+    } else if (waitingForName) {
+        // Toon game over achtergrond terwijl naam invoer zichtbaar is
+        const boxW = 450 * scale;
+        const boxH = 200 * scale;
+        const boxX = canvas.width/2 - boxW/2;
+        const boxY = canvas.height/2 - boxH/2 - 60 * scale;
+
+        ctx.fillStyle = '#FFF8DC';
+        doodleRect(boxX, boxY, boxW, boxH, 8);
+        ctx.fill();
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 5 * scale;
+        ctx.stroke();
+
+        // Wiebelige Game Over titel
+        ctx.save();
+        ctx.translate(canvas.width/2, boxY + 60 * scale);
+        ctx.rotate(Math.sin(time * 3) * 0.05);
+
+        ctx.fillStyle = '#222222';
+        ctx.font = `bold ${52 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.textAlign = 'center';
+        ctx.fillText('GAME OVER', 3 * scale, 3 * scale);
+        ctx.fillStyle = '#FF6B6B';
+        ctx.fillText('GAME OVER', 0, 0);
+        ctx.restore();
+
+        // Score
+        ctx.fillStyle = '#FFD700';
+        ctx.font = `${60 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.textAlign = 'center';
+        ctx.fillText('⭐', canvas.width/2, boxY + 130 * scale);
+
+        ctx.fillStyle = '#222222';
+        ctx.font = `bold ${22 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.fillText(`${score}`, canvas.width/2, boxY + 137 * scale);
+
+        if (score >= highScore && score > 0) {
+            ctx.fillStyle = '#FF6B6B';
+            ctx.font = `bold ${20 * scale}px Patrick Hand, Comic Sans MS`;
+            ctx.fillText('NIEUW RECORD!', canvas.width/2, boxY + 175 * scale);
+        }
+
+        // Verdrietige emoji's
+        ctx.font = `${25 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.fillText('😢', boxX + 35 * scale, boxY + 35 * scale);
+        ctx.fillText('💀', boxX + boxW - 45 * scale, boxY + 35 * scale);
+
+    } else {
+        // Standaard game over scherm (fallback, zou niet bereikt moeten worden)
+        const boxW = 450 * scale;
+        const boxH = 300 * scale;
+        const boxX = canvas.width/2 - boxW/2;
+        const boxY = canvas.height/2 - boxH/2;
+
+        ctx.fillStyle = '#FFF8DC';
+        doodleRect(boxX, boxY, boxW, boxH, 8);
+        ctx.fill();
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 5 * scale;
+        ctx.stroke();
+
+        // Wiebelige Game Over titel
+        ctx.save();
+        ctx.translate(canvas.width/2, canvas.height/2 - 80 * scale);
+        ctx.rotate(Math.sin(time * 3) * 0.05);
+
+        ctx.fillStyle = '#222222';
+        ctx.font = `bold ${52 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.textAlign = 'center';
+        ctx.fillText('GAME OVER', 3 * scale, 3 * scale);
+        ctx.fillStyle = '#FF6B6B';
+        ctx.fillText('GAME OVER', 0, 0);
+        ctx.restore();
+
+        // Score
+        ctx.fillStyle = '#FFD700';
+        ctx.font = `${60 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.textAlign = 'center';
+        ctx.fillText('⭐', canvas.width/2, canvas.height/2 + 5 * scale);
+
+        ctx.fillStyle = '#222222';
+        ctx.font = `bold ${22 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.fillText(`${score}`, canvas.width/2, canvas.height/2 + 12 * scale);
+
+        if (score >= highScore && score > 0) {
+            ctx.fillStyle = '#FF6B6B';
+            ctx.font = `bold ${20 * scale}px Patrick Hand, Comic Sans MS`;
+            ctx.fillText('NIEUW RECORD!', canvas.width/2, canvas.height/2 + 55 * scale);
+        } else {
+            ctx.fillStyle = '#666666';
+            ctx.font = `${18 * scale}px Patrick Hand, Comic Sans MS`;
+            ctx.fillText(`Best: ${highScore}`, canvas.width/2, canvas.height/2 + 55 * scale);
+        }
+
+        // Retry knop
+        const blink = Math.sin(time * 4) > 0;
+        if (blink) {
+            const btnW = 280 * scale;
+            const btnH = 40 * scale;
+            const btnX = canvas.width/2 - btnW/2;
+            const btnY = canvas.height/2 + 80 * scale;
+
+            ctx.fillStyle = '#90EE90';
+            doodleRect(btnX, btnY, btnW, btnH, 4);
+            ctx.fill();
+            ctx.strokeStyle = '#222222';
+            ctx.lineWidth = 3 * scale;
+            ctx.stroke();
+
+            ctx.fillStyle = '#222222';
+            ctx.font = `bold ${18 * scale}px Patrick Hand, Comic Sans MS`;
+            ctx.textBaseline = 'middle';
+            ctx.fillText('SPATIE = Opnieuw', canvas.width/2, btnY + btnH / 2);
+            ctx.textBaseline = 'alphabetic';
+        }
+
+        // Verdrietige emoji's
+        ctx.font = `${25 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.fillText('😢', boxX + 35 * scale, boxY + 40 * scale);
+        ctx.fillText('💀', boxX + boxW - 45 * scale, boxY + 40 * scale);
+    }
 }
 
 // ============================================
