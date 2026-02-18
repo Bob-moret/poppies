@@ -112,6 +112,32 @@ groundImage.src = 'assets/grond.png';
 groundImage.onload = () => { groundImageLoaded = true; };
 groundImage.onerror = () => { groundImageLoaded = false; };
 
+// Platform sprites
+const platformImage = new Image();
+let platformImageLoaded = false;
+platformImage.src = 'assets/platform.png';
+platformImage.onload = () => { platformImageLoaded = true; };
+platformImage.onerror = () => { platformImageLoaded = false; };
+
+const platformCrackedImage = new Image();
+let platformCrackedImageLoaded = false;
+platformCrackedImage.src = 'assets/platform cracked.png';
+platformCrackedImage.onload = () => { platformCrackedImageLoaded = true; };
+platformCrackedImage.onerror = () => { platformCrackedImageLoaded = false; };
+
+// Munt sprites (afwisselend)
+const coinFrames = [];
+const coinFrameCount = 2;
+let coinFramesLoaded = 0;
+
+for (let i = 1; i <= coinFrameCount; i++) {
+    const img = new Image();
+    img.src = `assets/coin${i}.png`;
+    img.onload = () => { img.loaded = true; coinFramesLoaded++; };
+    img.onerror = () => { img.loaded = false; };
+    coinFrames.push(img);
+}
+
 // ============================================
 // AUDIO SYSTEEM
 // ============================================
@@ -1345,48 +1371,20 @@ function drawPlatform(platform) {
             }
         }
     } else {
-        // Cartoony zwevend platform
-        if (platform.breakable) {
-            ctx.fillStyle = '#F4A460';
+        // Zwevend platform met sprite
+        const useSprite = platform.breakable
+            ? (platformCrackedImageLoaded && platformCrackedImage)
+            : (platformImageLoaded && platformImage);
+
+        if (useSprite) {
+            ctx.drawImage(useSprite, screenX, py, pw, ph);
         } else {
-            ctx.fillStyle = '#DEB887';
-        }
-
-        // Wiebelige rechthoek
-        doodleRect(screenX, py, pw, ph, 3);
-        ctx.fill();
-
-        // Dikke zwarte outline
-        ctx.strokeStyle = '#222222';
-        ctx.lineWidth = 4 * scale;
-        ctx.stroke();
-
-        // Simpele houtnerf lijntjes
-        ctx.strokeStyle = '#A0522D';
-        ctx.lineWidth = 2 * scale;
-        for (let i = 20 * scale; i < pw - 10; i += 35 * scale) {
-            ctx.beginPath();
-            ctx.moveTo(screenX + i, py + 5 * scale);
-            ctx.lineTo(screenX + i + 5 * scale, py + ph - 5 * scale);
-            ctx.stroke();
-        }
-
-        // Scheuren voor breekbare platforms - zigzag stijl
-        if (platform.breakable) {
+            // Fallback: cartoony zwevend platform
+            ctx.fillStyle = platform.breakable ? '#F4A460' : '#DEB887';
+            doodleRect(screenX, py, pw, ph, 3);
+            ctx.fill();
             ctx.strokeStyle = '#222222';
-            ctx.lineWidth = 2 * scale;
-            // Scheur 1
-            ctx.beginPath();
-            ctx.moveTo(screenX + pw * 0.3, py);
-            ctx.lineTo(screenX + pw * 0.35, py + ph * 0.3);
-            ctx.lineTo(screenX + pw * 0.28, py + ph * 0.6);
-            ctx.lineTo(screenX + pw * 0.33, py + ph);
-            ctx.stroke();
-            // Scheur 2
-            ctx.beginPath();
-            ctx.moveTo(screenX + pw * 0.7, py);
-            ctx.lineTo(screenX + pw * 0.65, py + ph * 0.4);
-            ctx.lineTo(screenX + pw * 0.72, py + ph);
+            ctx.lineWidth = 4 * scale;
             ctx.stroke();
         }
     }
@@ -1584,25 +1582,41 @@ function drawCoin(coin) {
     const cy = coin.y * scale;
     const time = Date.now() / 400;
     const bounce = Math.sin(time * 3) * 3 * scale;
+    const coinSize = 36 * scale;
 
     ctx.translate(screenX + 15 * scale, cy + 15 * scale + bounce);
 
-    // Cartoony munt met dikke outline
-    ctx.fillStyle = '#FFD700';
-    doodleCircle(0, 0, 16 * scale);
-    ctx.fill();
+    if (coinFramesLoaded >= coinFrameCount) {
+        // Rustige 3D rotatie: coin1 aan voorkant, coin2 aan achterkant
+        const spinSpeed = 0.0015; // Langzame rotatie
+        const angle = (Date.now() * spinSpeed) % (Math.PI * 2);
+        const scaleX = Math.cos(angle);
 
-    // Dikke zwarte outline
-    ctx.strokeStyle = '#222222';
-    ctx.lineWidth = 4 * scale;
-    ctx.stroke();
+        // Kies zijde: voorkant (coin1) of achterkant (coin2)
+        const frameIndex = scaleX >= 0 ? 0 : 1;
+        const img = coinFrames[frameIndex];
 
-    // Dollar/ster teken in het midden
-    ctx.fillStyle = '#222222';
-    ctx.font = `bold ${18 * scale}px Patrick Hand, Comic Sans MS`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('★', 0, 1 * scale);
+        if (img && img.loaded) {
+            // Horizontale schaling voor 3D-effect
+            ctx.scale(Math.abs(scaleX), 1);
+            ctx.drawImage(img, -coinSize / 2, -coinSize / 2, coinSize, coinSize);
+        }
+    } else {
+        // Fallback: procedurele munt
+        ctx.fillStyle = '#FFD700';
+        doodleCircle(0, 0, 16 * scale);
+        ctx.fill();
+
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 4 * scale;
+        ctx.stroke();
+
+        ctx.fillStyle = '#222222';
+        ctx.font = `bold ${18 * scale}px Patrick Hand, Comic Sans MS`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('★', 0, 1 * scale);
+    }
 
     ctx.restore();
 }
