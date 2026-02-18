@@ -62,16 +62,14 @@ function positionTouchZones() {
     const leftZone = document.getElementById('touchZoneLeft');
     const rightZone = document.getElementById('touchZoneRight');
 
+    // Houd links/rechts altijd naast elkaar, schuif zo ver mogelijk naar de rand
+    leftZone.style.flexDirection = 'row';
     if (leftMargin > 40) {
-        // Knoppen naast het canvas stapelen en centreren in de marge
-        leftZone.style.flexDirection = 'column';
-        leftZone.style.left = Math.max(4, Math.round((leftMargin - leftZone.offsetWidth) / 2)) + 'px';
-        leftZone.style.right = '';
+        leftZone.style.left = Math.max(4, Math.round(leftMargin - leftZone.offsetWidth - 4)) + 'px';
     } else {
-        leftZone.style.flexDirection = 'row';
         leftZone.style.left = '6px';
-        leftZone.style.right = '';
     }
+    leftZone.style.right = '';
 
     if (rightMargin > 40) {
         rightZone.style.right = Math.max(4, Math.round((rightMargin - rightZone.offsetWidth) / 2)) + 'px';
