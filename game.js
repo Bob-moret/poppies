@@ -35,7 +35,9 @@ function resizeCanvas() {
         cssWidth = BASE_WIDTH * ratio;
         cssHeight = BASE_HEIGHT * ratio;
     } else {
-        cssWidth = Math.min(BASE_WIDTH, window.innerWidth - 40);
+        // Desktop: beperk tot container breedte
+        const containerWidth = gameContainer.clientWidth - 20; // padding aftrekken
+        cssWidth = Math.min(BASE_WIDTH, containerWidth, window.innerWidth - 40);
         cssHeight = (cssWidth / BASE_WIDTH) * BASE_HEIGHT;
     }
 
@@ -2452,23 +2454,34 @@ function draw() {
     }
 }
 
-// Fixed timestep: physics draait altijd op 60 ticks/s, ongeacht scherm-framerate
+// Fixed timestep met interpolatie voor vloeiende weergave op elk scherm
 const FIXED_DT = 1000 / 60;
 let lastTime = 0;
 let accumulator = 0;
+let prevCameraX = 0;
 
 function gameLoop(timestamp) {
     if (lastTime === 0) lastTime = timestamp;
-    const elapsed = Math.min(timestamp - lastTime, 200); // Cap om spiraal te voorkomen
+    const elapsed = Math.min(timestamp - lastTime, 50); // Max 3 frames inhalen
     lastTime = timestamp;
     accumulator += elapsed;
 
     while (accumulator >= FIXED_DT) {
+        prevCameraX = cameraX;
         update();
         accumulator -= FIXED_DT;
     }
 
+    // Interpoleer camera voor vloeiende weergave tussen physics-stappen
+    const alpha = accumulator / FIXED_DT;
+    const physicsCameraX = cameraX;
+    cameraX = prevCameraX + (cameraX - prevCameraX) * alpha;
+
     draw();
+
+    // Herstel physics-cameraX voor volgende update
+    cameraX = physicsCameraX;
+
     requestAnimationFrame(gameLoop);
 }
 
