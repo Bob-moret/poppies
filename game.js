@@ -25,17 +25,25 @@ function isTouchDevice() {
 function resizeCanvas() {
     const isFullscreen = !!document.fullscreenElement;
     const isMobileLandscape = isTouchDevice() && window.innerWidth > window.innerHeight;
+    const dpr = window.devicePixelRatio || 1;
 
+    let cssWidth, cssHeight;
     if (isFullscreen || isMobileLandscape) {
         const maxWidth = window.innerWidth * (isMobileLandscape ? 1.0 : 0.95);
         const maxHeight = window.innerHeight * (isMobileLandscape ? 1.0 : 0.85);
         const ratio = Math.min(maxWidth / BASE_WIDTH, maxHeight / BASE_HEIGHT);
-        canvas.width = BASE_WIDTH * ratio;
-        canvas.height = BASE_HEIGHT * ratio;
+        cssWidth = BASE_WIDTH * ratio;
+        cssHeight = BASE_HEIGHT * ratio;
     } else {
-        canvas.width = Math.min(BASE_WIDTH, window.innerWidth - 40);
-        canvas.height = (canvas.width / BASE_WIDTH) * BASE_HEIGHT;
+        cssWidth = Math.min(BASE_WIDTH, window.innerWidth - 40);
+        cssHeight = (cssWidth / BASE_WIDTH) * BASE_HEIGHT;
     }
+
+    // CSS bepaalt weergavegrootte, canvas.width/height bepaalt renderresolutie
+    canvas.style.width = cssWidth + 'px';
+    canvas.style.height = cssHeight + 'px';
+    canvas.width = Math.round(cssWidth * dpr);
+    canvas.height = Math.round(cssHeight * dpr);
 }
 
 // ============================================
@@ -2413,8 +2421,22 @@ function draw() {
     }
 }
 
-function gameLoop() {
-    update();
+// Fixed timestep: physics draait altijd op 60 ticks/s, ongeacht scherm-framerate
+const FIXED_DT = 1000 / 60;
+let lastTime = 0;
+let accumulator = 0;
+
+function gameLoop(timestamp) {
+    if (lastTime === 0) lastTime = timestamp;
+    const elapsed = Math.min(timestamp - lastTime, 200); // Cap om spiraal te voorkomen
+    lastTime = timestamp;
+    accumulator += elapsed;
+
+    while (accumulator >= FIXED_DT) {
+        update();
+        accumulator -= FIXED_DT;
+    }
+
     draw();
     requestAnimationFrame(gameLoop);
 }
@@ -2425,7 +2447,7 @@ function gameLoop() {
 resizeCanvas();
 scoreDisplay.textContent = 'Score: 0';
 levelDisplay.textContent = `Level: ${currentLevel}`;
-gameLoop();
+requestAnimationFrame(gameLoop);
 
 canvas.setAttribute('tabindex', '0');
 canvas.focus();
