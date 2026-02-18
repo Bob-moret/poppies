@@ -23,7 +23,7 @@ function isTouchDevice() {
 }
 
 function resizeCanvas() {
-    const isFullscreen = document.fullscreenElement === gameContainer;
+    const isFullscreen = !!document.fullscreenElement;
     const isMobileLandscape = isTouchDevice() && window.innerWidth > window.innerHeight;
 
     if (isFullscreen || isMobileLandscape) {
@@ -743,15 +743,37 @@ canvas.addEventListener('touchend', (e) => {
 // ============================================
 // FULLSCREEN
 // ============================================
-fullscreenBtn.addEventListener('click', () => {
-    if (gameContainer.requestFullscreen) {
-        gameContainer.requestFullscreen();
-    } else if (gameContainer.webkitRequestFullscreen) {
-        gameContainer.webkitRequestFullscreen();
+function goFullscreen() {
+    const el = document.documentElement;
+    if (el.requestFullscreen) {
+        el.requestFullscreen();
+    } else if (el.webkitRequestFullscreen) {
+        el.webkitRequestFullscreen();
     }
-});
+}
+
+fullscreenBtn.addEventListener('click', goFullscreen);
+
+// Op mobiel landscape: automatisch fullscreen bij eerste interactie
+if (isTouchDevice()) {
+    let autoFullscreenDone = false;
+    const tryAutoFullscreen = () => {
+        if (autoFullscreenDone) return;
+        if (window.innerWidth > window.innerHeight && !document.fullscreenElement) {
+            goFullscreen();
+        }
+        autoFullscreenDone = true;
+        document.removeEventListener('touchstart', tryAutoFullscreen);
+    };
+    document.addEventListener('touchstart', tryAutoFullscreen, { once: true });
+}
 
 document.addEventListener('fullscreenchange', () => {
+    resizeCanvas();
+    canvas.focus();
+});
+
+document.addEventListener('webkitfullscreenchange', () => {
     resizeCanvas();
     canvas.focus();
 });
