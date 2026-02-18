@@ -101,13 +101,7 @@ h1::after {
 }
 
 .game-header {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    max-width: 100%;
-    padding: 6px 20px;
-    margin-bottom: 8px;
+    display: none;
 }
 
 #gameCanvas {
@@ -466,36 +460,10 @@ h1::after {
         display: none !important;
     }
 
-    .game-header {
-        position: fixed;
-        top: 0;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 500;
-        padding: 4px 16px;
-        margin: 0;
-        background: transparent;
-        padding-top: env(safe-area-inset-top, 4px);
-    }
-
-    .score-display span {
-        font-size: 0.9em;
-        padding: 4px 12px;
-        border-width: 2px;
-        background: rgba(250, 240, 220, 0.8);
-        box-shadow: 1px 1px 0 rgba(45, 24, 16, 0.3);
-    }
-
-    #levelDisplay {
-        background: rgba(45, 24, 16, 0.8) !important;
-    }
-
     #gameCanvas {
         border: none;
         border-radius: 0;
         box-shadow: none;
-        width: 100vw !important;
-        height: 100vh !important;
         max-width: none;
     }
 

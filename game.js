@@ -2297,6 +2297,55 @@ function drawGameOver() {
 // MAIN LOOP
 // ============================================
 
+// HUD: score en level direct op het canvas
+function drawHUD() {
+    const scale = getScale();
+    const padding = 14 * scale;
+    const boxH = 34 * scale;
+    const fontSize = 20 * scale;
+    const cornerRadius = 4 * scale;
+
+    ctx.save();
+    ctx.font = `bold ${fontSize}px Patrick Hand, Comic Sans MS`;
+    ctx.textBaseline = 'middle';
+
+    // --- Score (linksboven) ---
+    const scoreText = `Score: ${score}`;
+    const scoreW = ctx.measureText(scoreText).width + 24 * scale;
+    const scoreX = padding;
+    const scoreY = padding;
+
+    ctx.fillStyle = 'rgba(250, 240, 220, 0.8)';
+    doodleRect(scoreX, scoreY, scoreW, boxH, 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(45, 24, 16, 0.6)';
+    ctx.lineWidth = 2 * scale;
+    ctx.stroke();
+
+    ctx.fillStyle = '#2d1810';
+    ctx.textAlign = 'left';
+    ctx.fillText(scoreText, scoreX + 12 * scale, scoreY + boxH / 2);
+
+    // --- Level (rechtsboven) ---
+    const levelText = `Level: ${currentLevel}`;
+    const levelW = ctx.measureText(levelText).width + 24 * scale;
+    const levelX = canvas.width - padding - levelW;
+    const levelY = padding;
+
+    ctx.fillStyle = 'rgba(45, 24, 16, 0.8)';
+    doodleRect(levelX, levelY, levelW, boxH, 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(139, 69, 19, 0.6)';
+    ctx.lineWidth = 2 * scale;
+    ctx.stroke();
+
+    ctx.fillStyle = '#faf0dc';
+    ctx.textAlign = 'left';
+    ctx.fillText(levelText, levelX + 12 * scale, levelY + boxH / 2);
+
+    ctx.restore();
+}
+
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -2325,6 +2374,11 @@ function draw() {
 
     // Teken speler
     drawPlayer();
+
+    // HUD: score en level op het canvas
+    if (gameStarted && gameRunning && !levelComplete && !gameWon) {
+        drawHUD();
+    }
 
     if (!gameStarted) {
         drawStartScreen();
